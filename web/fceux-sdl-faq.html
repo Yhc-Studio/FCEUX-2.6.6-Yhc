@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+ <meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+  <title>FCEUX SDL FAQ</title>
+  <link href="fceux.css" rel="stylesheet" type="text/css" />
+ </head>
+ <body>
+<div id="masthead">
+	<span class="largerfont">FCEUX<br/></span>The all in one NES/Famicom/Dendy Emulator
+</div>
+<div id="top_nav">
+  <a href="home.html">Home</a>
+  <a href="download.html">Download</a>
+  <a href="documentation.html">Documentation</a>
+  <a href="version.html">Versions</a>
+  <a href="contact.html">Contact</a>
+  <a href="links.html">Links</a>
+</div>
+ <div id="container">
+	<div id="left_col">
+	</div>
+	<div id="page_content">
+
+  <center><h1>FCEUX SDL FAQ</h1></center>
+  <center><i>Last updated December 9, 2020<br /></i> by mjbudd77<br />
+  </center>
+ <p><b>Table of Contents:</b></p>
+ <ul>
+  <li><a href="#git">What is the git build and how can I get it?</a></li>
+  <li><a href="#config">How do I configure a gamepad?</a></li>
+  <li><a href="#sound">My sound is stuttery/laggy.  How can I fix this?</a></li>
+  <li><a href="#timing">My game is skipping frames.  How can I fix this?</a></li>
+  <li><a href="#hotkeys1">How can I change my hotkey bindings?</a></li>
+  <li><a href="#hotkeys2">Can I map hotkeys to my gamepad?</a></li>
+ </ul>
+ <a name="git"><h3>What is the git build and how can I get it?</h3></a>
+ <p>The most recent changes to fceuX are reflected immediately in the fceux
+ github server.  You can checkout the source code to build
+ fceuX with the most recent sources by running the following command:</p>
+ <p><b>git clone https://github.com/TASEmulators/fceux.git</b></p>
+ <p>Instructions for compiling and installing fceuX can be found in the "README" file.</p>
+ <a name="config"><h3>How do I configure a gamepad?</h3></a>
+ <p>Using the Qt GUI, you can configure the gamepad by
+ selecting "Options...Gamepad" in the menubar.</p>
+ </p>
+ <a name="sound"><h3>My sound is stuttery/laggy.  How can I fix this?</h3></a>
+ <p>Try using different SDL audio drivers.  You can set the SDL audio driver with
+ the following command:</p>
+ <p><b>export SDL_AUDIODRIVER=driver</b></p>
+ <p>where driver is: esd,oss,alsa,pulse,nas,arts.</p>
+ <p>There have been a lot of sound related bug fixes for the SDL port in recent releases, so 
+ you may want to try the latest version of fceuX to see if you are still having issues.  FceuX 
+ 2.1.4 fixed the majority of the reported sound issues.
+ </p>
+ <a name="timing"><h3>My game is skipping frames.  How can I improve this?</h3></a>
+ <p>The Qt/SDL version of fceux runs two threads. One for the GUI and one for the emulation. 
+ The realtime OS scheduling and priority of both of these threads can be tuned via the GUI 
+ timing config options window (accessible via the menu bar). For Mac OSX systems, fceux must
+ have root permission to increase process priority. For Linux systems, add the following
+ lines to the <b>/etc/security/limits.conf</b> file to ensure that fceux users have the proper system
+ resource permissions (requires reboot after editing for changes to take place):
+ <pre>
+*                -    priority     99    
+*                -    rtprio       99    
+*                -    nice        -20    
+ </pre>
+ </p>
+ <a name="hotkeys1"><h3>How can I change my emulator hotkey bindings?</h3></a>
+ <p>SDL hotkey bindings can be remapped using the Qt GUI. Selecting "Options...HotKeys" in the menubar.
+ </p>
+ <a name="hotkeys2"><h3>Can I map emulator hotkeys to my gamepad?</h3></a>
+ <p>If you want to map particular hotkeys (pause, save state, load state, etc) to buttons on 
+ your gamepad, you can use software that allows you to map joystick events to key presses. 
+ <a href="http://qjoypad.sourceforge.net/">qjoypad</a> is the recomended solution for this.  You
+  can also use <a href="http://code.google.com/p/jkeys/">Jkeys</a> to do this. 
+
+        
+ <a name="credits"><h2>Credits</h2></a>
+ <p>
+ <table border width="100%">
+  <tr><th>Name:</th><th>Contribution(s):</th></tr>
+  <tr><td><a href="mailto:ltsmooth42 _at_ gmail _dot_ com">Lukas Sabota</a></td>
+  <td>Author of this document</td></tr>
+  <tr><td>mjbudd77</td>
+  <td>Qt/SDL Updates</td></tr>
+ </table>
+ </p>
+ </div>
+ </div>
+ <div id="footer">
+	<a href="home.html">Home</a> | <a href="download.html">Download</a> |
+	<a href="documentation.html">Documentation</a> | <a href="version.html">
+	Version History</a> | <a href="contact.html">Contact</a> | <a href="links.html">Links</a>
+		<br/>We are in no way affiliated or endorsed by Nintendo or Nintendo of America. "Nintendo" is a registered trademark of Nintendo of America Inc.
+		<br/>©2009 adelikat
+</div>
+</body>
+</html>

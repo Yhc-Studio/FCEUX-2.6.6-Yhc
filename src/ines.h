@@ -1,0 +1,571 @@
+/* FCE Ultra - NES/Famicom Emulator
+ *
+ * Copyright notice for this file:
+ *  Copyright (C) 1998 Bero
+ *  Copyright (C) 2002 Xodnizel
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+
+#ifndef _INES_H_
+#define _INES_H_
+#include <stdlib.h>
+#include <string.h>
+#include <map>
+
+#include "cart.h"
+
+struct TMasterRomInfo
+{
+	uint64 md5lower;
+	const char* params;
+};
+
+class TMasterRomInfoParams : public std::map<std::string,std::string>
+{
+public:
+	bool ContainsKey(const std::string& key) { return find(key) != end(); }
+};
+
+//mbg merge 6/29/06
+extern uint8 *ROM;
+extern uint8 *VROM;
+extern uint8* MiscROM;
+extern uint32 VROM_size;
+extern uint32 ROM_size;
+extern uint32 MiscROM_size;
+extern uint8* trainerpoo;
+extern uint8 *ExtraNTARAM;
+extern uint8 **VPageR;
+extern int iNesSave(void); //bbit Edited: line added
+extern int iNesSaveAs(const char* name);
+extern char LoadedRomFName[4096]; //bbit Edited: line added
+extern char LoadedRomFNamePatchToUse[4096];
+extern char *iNesShortFName(void);
+extern const TMasterRomInfo* MasterRomInfo;
+extern TMasterRomInfoParams MasterRomInfoParams;
+
+//mbg merge 7/19/06 changed to c++ decl format
+struct iNES_HEADER {
+	char ID[4]; /*NES^Z*/		// 0-3
+	uint8 ROM_size;				// 4
+	uint8 VROM_size;			// 5
+	uint8 ROM_type;				// 6
+	uint8 ROM_type2;			// 7
+	uint8 ROM_type3;			// 8
+	uint8 Upper_ROM_VROM_size;	// 9
+	uint8 RAM_size;				// 10
+	uint8 VRAM_size;			// 11
+	uint8 TV_system;			// 12
+	uint8 VS_hardware;			// 13
+	uint8 misc_roms;			// 14
+	uint8 expansion;			// 15
+
+	void cleanup()
+	{
+		if(!memcmp((char*)(this) + 0x7, "DiskDude", 8) || !memcmp((char*)(this) + 0x7, "demiforce", 9))
+			memset((char*)(this) + 0x7, 0, 0x9);
+
+		if(!memcmp((char*)(this) + 0xA, "Ni03", 4))
+		{
+			if(!memcmp((char*)(this) + 0x7, "Dis", 3))
+				memset((char*)(this) + 0x7, 0, 0x9);
+			else
+				memset((char*)(this) + 0xA, 0, 0x6);
+		}
+	}
+};
+
+extern struct iNES_HEADER head; //for mappers usage
+
+void NSFVRC6_Init(void);
+void NSFMMC5_Init(void);
+void NSFAY_Init(void);
+void NSFN106_Init(void);
+void NSFVRC7_Init(void);
+
+void Mapper1_Init(CartInfo *);
+void Mapper4_Init(CartInfo *);
+void Mapper5_Init(CartInfo *);
+void Mapper6_Init(CartInfo *);
+void Mapper8_Init(CartInfo *);
+void Mapper9_Init(CartInfo *);
+void Mapper10_Init(CartInfo *);
+void Mapper11_Init(CartInfo *);
+void Mapper12_Init(CartInfo *);
+void Mapper15_Init(CartInfo *);
+void Mapper16_Init(CartInfo *);
+void Mapper17_Init(CartInfo *);
+void Mapper18_Init(CartInfo *);
+void Mapper19_Init(CartInfo *);
+void Mapper21_Init(CartInfo *);
+void Mapper22_Init(CartInfo *);
+void Mapper23_Init(CartInfo *);
+void Mapper24_Init(CartInfo *);
+void Mapper25_Init(CartInfo *);
+void Mapper26_Init(CartInfo *);
+void Mapper28_Init(CartInfo *);
+void Mapper29_Init(CartInfo *);
+void Mapper31_Init(CartInfo *);
+void Mapper32_Init(CartInfo *);
+void Mapper33_Init(CartInfo *);
+void Mapper34_Init(CartInfo *);
+void Mapper36_Init(CartInfo *);
+void Mapper37_Init(CartInfo *);
+void Mapper38_Init(CartInfo *);
+void Mapper40_Init(CartInfo *);
+void Mapper41_Init(CartInfo *);
+void Mapper42_Init(CartInfo *);
+void Mapper43_Init(CartInfo *);
+void Mapper44_Init(CartInfo *);
+void Mapper45_Init(CartInfo *);
+void Mapper46_Init(CartInfo *);
+void Mapper47_Init(CartInfo *);
+void Mapper48_Init(CartInfo *);
+void Mapper49_Init(CartInfo *);
+void Mapper50_Init(CartInfo *);
+void Mapper51_Init(CartInfo *);
+void Mapper52_Init(CartInfo *);
+void Mapper57_Init(CartInfo *);
+void Mapper59_Init(CartInfo *);
+void Mapper61_Init(CartInfo *);
+void Mapper62_Init(CartInfo *);
+void Mapper64_Init(CartInfo *);
+void Mapper65_Init(CartInfo *);
+void Mapper67_Init(CartInfo *);
+void Mapper68_Init(CartInfo *);
+void Mapper69_Init(CartInfo *);
+void Mapper70_Init(CartInfo *);
+void Mapper71_Init(CartInfo *);
+void Mapper72_Init(CartInfo *);
+void Mapper73_Init(CartInfo *);
+void Mapper74_Init(CartInfo *);
+void Mapper75_Init(CartInfo *);
+void Mapper76_Init(CartInfo *);
+void Mapper77_Init(CartInfo *);
+void Mapper78_Init(CartInfo *);
+void Mapper79_Init(CartInfo *);
+void Mapper80_Init(CartInfo *);
+void Mapper81_Init(CartInfo *);
+void Mapper82_Init(CartInfo *);
+void Mapper83_Init(CartInfo *);
+void Mapper85_Init(CartInfo *);
+void Mapper86_Init(CartInfo *);
+void Mapper87_Init(CartInfo *);
+void Mapper88_Init(CartInfo *);
+void Mapper89_Init(CartInfo *);
+void Mapper90_Init(CartInfo *);
+void Mapper91_Init(CartInfo *);
+void Mapper92_Init(CartInfo *);
+void Mapper93_Init(CartInfo *);
+void Mapper94_Init(CartInfo *);
+void Mapper95_Init(CartInfo *);
+void Mapper96_Init(CartInfo *);
+void Mapper97_Init(CartInfo *);
+void Mapper99_Init(CartInfo *);
+void Mapper101_Init(CartInfo *);
+void Mapper103_Init(CartInfo *);
+void Mapper105_Init(CartInfo *);
+void Mapper106_Init(CartInfo *);
+void Mapper107_Init(CartInfo *);
+void Mapper108_Init(CartInfo *);
+void Mapper111_Init(CartInfo *);
+void Mapper112_Init(CartInfo *);
+void Mapper113_Init(CartInfo *);
+void Mapper114_Init(CartInfo *);
+void Mapper115_Init(CartInfo *);
+void Mapper117_Init(CartInfo *);
+void Mapper119_Init(CartInfo *);
+void Mapper120_Init(CartInfo *);
+void Mapper121_Init(CartInfo *);
+void Mapper125_Init(CartInfo *);
+void Mapper134_Init(CartInfo *);
+void Mapper140_Init(CartInfo *);
+void Mapper144_Init(CartInfo *);
+void Mapper151_Init(CartInfo *);
+void Mapper152_Init(CartInfo *);
+void Mapper153_Init(CartInfo *);
+void Mapper154_Init(CartInfo *);
+void Mapper155_Init(CartInfo *);
+void Mapper156_Init(CartInfo *);
+void Mapper157_Init(CartInfo *);
+void Mapper159_Init(CartInfo *);
+void Mapper163_Init(CartInfo *);
+void Mapper164_Init(CartInfo *);
+void Mapper165_Init(CartInfo *);
+void Mapper166_Init(CartInfo *);
+void Mapper167_Init(CartInfo *);
+void Mapper168_Init(CartInfo *);
+void Mapper170_Init(CartInfo *);
+void Mapper171_Init(CartInfo *);
+void Mapper172_Init(CartInfo *);
+void Mapper173_Init(CartInfo *);
+void Mapper174_Init(CartInfo *);
+void Mapper175_Init(CartInfo *);
+void Mapper176_Init(CartInfo *);
+void Mapper177_Init(CartInfo *);
+void Mapper178_Init(CartInfo *);
+void Mapper180_Init(CartInfo *);
+void Mapper181_Init(CartInfo *);
+void Mapper183_Init(CartInfo *);
+void Mapper184_Init(CartInfo *);
+void Mapper185_Init(CartInfo *);
+void Mapper186_Init(CartInfo *);
+void Mapper187_Init(CartInfo *);
+void Mapper188_Init(CartInfo *);
+void Mapper189_Init(CartInfo *);
+void Mapper190_Init(CartInfo *);
+void Mapper191_Init(CartInfo *);
+void Mapper192_Init(CartInfo *);
+void Mapper193_Init(CartInfo *);
+void Mapper194_Init(CartInfo *);
+void Mapper195_Init(CartInfo *);
+void Mapper196_Init(CartInfo *);
+void Mapper197_Init(CartInfo *);
+void Mapper198_Init(CartInfo *);
+void Mapper199_Init(CartInfo *);
+void Mapper200_Init(CartInfo *);
+void Mapper201_Init(CartInfo *);
+void Mapper202_Init(CartInfo *);
+void Mapper203_Init(CartInfo *);
+void Mapper204_Init(CartInfo *);
+void Mapper205_Init(CartInfo *);
+void Mapper206_Init(CartInfo *);
+void Mapper207_Init(CartInfo *);
+void Mapper208_Init(CartInfo *);
+void Mapper209_Init(CartInfo *);
+void Mapper210_Init(CartInfo *);
+void Mapper211_Init(CartInfo *);
+void Mapper212_Init(CartInfo *);
+void Mapper213_Init(CartInfo *);
+void Mapper214_Init(CartInfo *);
+void Mapper216_Init(CartInfo *);
+void Mapper217_Init(CartInfo *);
+void Mapper218_Init(CartInfo *);
+void Mapper220_Init(CartInfo *);
+void Mapper222_Init(CartInfo *);
+void Mapper225_Init(CartInfo *);
+void Mapper226_Init(CartInfo *);
+void Mapper227_Init(CartInfo *);
+void Mapper228_Init(CartInfo *);
+void Mapper229_Init(CartInfo *);
+void Mapper230_Init(CartInfo *);
+void Mapper231_Init(CartInfo *);
+void Mapper232_Init(CartInfo *);
+void Mapper233_Init(CartInfo *);
+void Mapper234_Init(CartInfo *);
+void Mapper235_Init(CartInfo *);
+void Mapper236_Init(CartInfo *);
+void Mapper237_Init(CartInfo *);
+void Mapper240_Init(CartInfo *);
+void Mapper241_Init(CartInfo *);
+void Mapper242_Init(CartInfo *);
+void Mapper244_Init(CartInfo *);
+void Mapper245_Init(CartInfo *);
+void Mapper246_Init(CartInfo *);
+void Mapper249_Init(CartInfo *);
+void Mapper250_Init(CartInfo *);
+void Mapper252_Init(CartInfo *);
+void Mapper253_Init(CartInfo *);
+void Mapper254_Init(CartInfo *);
+void Mapper255_Init(CartInfo *);
+void Mapper354_Init(CartInfo *);
+void Mapper406_Init(CartInfo *);
+void Mapper523_Init(CartInfo *);
+void Mapper281_Init(CartInfo *);
+void Mapper282_Init(CartInfo *);
+void Mapper295_Init(CartInfo *);
+void Mapper358_Init(CartInfo *);
+void Mapper386_Init(CartInfo *);
+void Mapper387_Init(CartInfo *);
+void Mapper388_Init(CartInfo *);
+void Mapper394_Init(CartInfo *);
+void Mapper397_Init(CartInfo *);
+void Mapper421_Init(CartInfo *);
+void Mapper126_Init(CartInfo *);
+void Mapper422_Init(CartInfo *);
+void Mapper534_Init(CartInfo *);
+void NTDEC2291_Init(CartInfo *);
+void Mapper762_Init(CartInfo *);
+void Mapper748_Init(CartInfo *);
+void Mapper541_Init(CartInfo *);
+void Mapper288_Init(CartInfo *);
+void Mapper385_Init(CartInfo *);
+void Mapper409_Init(CartInfo *);
+void Mapper459_Init(CartInfo *);
+void Mapper461_Init(CartInfo *);
+void Mapper435_Init(CartInfo *);
+void Mapper468_Init(CartInfo *);
+void Mapper267_Init(CartInfo *);
+void Mapper269_Init(CartInfo *);
+void Mapper291_Init(CartInfo *);
+void Mapper293_Init(CartInfo *);
+void Mapper294_Init(CartInfo *);
+void Mapper297_Init(CartInfo *);
+void Mapper374_Init(CartInfo *);
+void Mapper297_Init(CartInfo *);
+void Mapper543_Init(CartInfo *);
+void Mapper550_Init(CartInfo *);
+void Mapper404_Init(CartInfo *);
+void Mapper310_Init(CartInfo *);
+void Mapper315_Init(CartInfo *);
+void Mapper319_Init(CartInfo *);
+void Mapper321_Init(CartInfo *);
+void Mapper326_Init(CartInfo *);
+void Mapper330_Init(CartInfo *);
+void Mapper334_Init(CartInfo *);
+void Mapper381_Init(CartInfo *);
+void Mapper429_Init(CartInfo *);
+void Mapper453_Init(CartInfo *);
+void Mapper454_Init(CartInfo *);
+void Mapper764_Init(CartInfo *);
+void Mapper464_Init(CartInfo *);
+void Mapper351_Init(CartInfo *);
+void Mapper353_Init(CartInfo *);
+void Mapper356_Init(CartInfo *);
+void Mapper357_Init(CartInfo *);
+void Mapper359_Init(CartInfo *);
+void Mapper360_Init(CartInfo *);
+void Mapper364_Init(CartInfo *);
+void Mapper368_Init(CartInfo *);
+void Mapper369_Init(CartInfo *);
+void Mapper370_Init(CartInfo *);
+void Mapper372_Init(CartInfo *);
+void Mapper375_Init(CartInfo *);
+void Mapper376_Init(CartInfo *);
+void Mapper377_Init(CartInfo *);
+void Mapper380_Init(CartInfo *);
+void Mapper382_Init(CartInfo *);
+void Mapper383_Init(CartInfo *);
+void Mapper389_Init(CartInfo *);
+void Mapper390_Init(CartInfo *);
+void Mapper389_Init(CartInfo *);
+void Mapper392_Init(CartInfo *);
+void Mapper393_Init(CartInfo *);
+void Mapper395_Init(CartInfo *);
+void Mapper396_Init(CartInfo *);
+void Mapper401_Init(CartInfo *);
+void Mapper403_Init(CartInfo *);
+void Mapper410_Init(CartInfo *);
+void Mapper411_Init(CartInfo *);
+void Mapper412_Init(CartInfo *);
+void Mapper414_Init(CartInfo *);
+void Mapper415_Init(CartInfo *);
+void Mapper416_Init(CartInfo *);
+void Mapper417_Init(CartInfo *);
+void Mapper428_Init(CartInfo *);
+void Mapper430_Init(CartInfo *);
+void Mapper431_Init(CartInfo *);
+void Mapper432_Init(CartInfo *);
+void Mapper433_Init(CartInfo *);
+void Mapper434_Init(CartInfo *);
+void Mapper436_Init(CartInfo *);
+void Mapper437_Init(CartInfo *);
+void Mapper438_Init(CartInfo *);
+void Mapper439_Init(CartInfo *);
+void Mapper441_Init(CartInfo *);
+void Mapper443_Init(CartInfo *);
+void Mapper444_Init(CartInfo *);
+void Mapper445_Init(CartInfo *);
+void Mapper449_Init(CartInfo *);
+void Mapper452_Init(CartInfo *);
+void Mapper455_Init(CartInfo *);
+void Mapper456_Init(CartInfo *);
+void Mapper457_Init(CartInfo *);
+void Mapper460_Init(CartInfo *);
+void Mapper463_Init(CartInfo *);
+void Mapper465_Init(CartInfo *);
+void Mapper466_Init(CartInfo *);
+void Mapper467_Init(CartInfo *);
+void Mapper472_Init(CartInfo *);
+void Mapper516_Init(CartInfo *);
+void Mapper533_Init(CartInfo *);
+void Mapper539_Init(CartInfo *);
+void Mapper554_Init(CartInfo *);
+void Mapper745_Init(CartInfo *);
+void Mapper747_Init(CartInfo *);
+void Mapper750_Init(CartInfo *);
+void Mapper757_Init(CartInfo *);
+void Mapper765_Init(CartInfo *);
+void Mapper538_Init(CartInfo *);
+void Mapper540_Init(CartInfo *);
+void Mapper553_Init(CartInfo *);
+void Mapper60_Init(CartInfo *);
+void Mapper271_Init(CartInfo *);
+void Mapper474_Init(CartInfo *);
+void Mapper740_Init(CartInfo *);
+void Mapper763_Init(CartInfo *);
+void Mapper743_Init(CartInfo *);
+void Mapper739_Init(CartInfo *);
+void Mapper476_Init(CartInfo *);
+void Mapper343_Init(CartInfo *);
+void Mapper379_Init(CartInfo *);
+void Mapper564_Init(CartInfo *);
+void Mapper378_Init(CartInfo *);
+void Mapper280_Init(CartInfo *);
+void Mapper413_Init(CartInfo *);
+void Mapper448_Init(CartInfo *);
+void Mapper556_Init(CartInfo *);
+void Mapper528_Init(CartInfo *);
+void Mapper500_Init(CartInfo*);
+void Mapper501_Init(CartInfo*);
+void Mapper502_Init(CartInfo*);
+void Mapper277_Init(CartInfo*);
+void Mapper420_Init(CartInfo*);
+void Mapper458_Init(CartInfo*);
+void Mapper362_Init(CartInfo*);
+void Mapper398_Init(CartInfo*);
+void Mapper128_Init(CartInfo*);
+void Mapper555_Init(CartInfo*);
+void Mapper759_Init(CartInfo*);
+void Mapper367_Init(CartInfo*);
+void Mapper373_Init(CartInfo*);
+void Mapper736_Init(CartInfo*);
+void Mapper738_Init(CartInfo*);
+void Mapper754_Init(CartInfo*);
+void Mapper451_Init(CartInfo*);
+void Mapper471_Init(CartInfo*);
+void Mapper734_Init(CartInfo*);
+void Mapper478_Init(CartInfo*);
+void Mapper475_Init(CartInfo*);
+void Mapper352_Init(CartInfo*);
+void Mapper485_Init(CartInfo*);
+void Mapper732_Init(CartInfo*);
+void Mapper751_Init(CartInfo*);
+void Mapper749_Init(CartInfo*);
+void Mapper746_Init(CartInfo*);
+void Mapper733_Init(CartInfo*);
+void Mapper735_Init(CartInfo*);
+void Mapper545_Init(CartInfo*);
+void Mapper481_Init(CartInfo*);
+void Mapper487_Init(CartInfo*);
+void Mapper473_Init(CartInfo*);
+void Mapper494_Init(CartInfo*);
+void Mapper489_Init(CartInfo*);
+void Mapper399_Init(CartInfo*);
+void Mapper484_Init(CartInfo*);
+void Mapper477_Init(CartInfo*);
+void Mapper480_Init(CartInfo*);
+void Mapper482_Init(CartInfo*);
+void Mapper486_Init(CartInfo*);
+void Mapper488_Init(CartInfo*);
+void Mapper492_Init(CartInfo*);
+void Mapper737_Init(CartInfo*);
+void Mapper558_Init(CartInfo*);
+void Mapper384_Init(CartInfo*);
+void Mapper447_Init(CartInfo*);
+void Mapper450_Init(CartInfo*);
+void Mapper520_Init(CartInfo*);
+void Mapper542_Init(CartInfo*);
+void Mapper544_Init(CartInfo*);
+void Mapper559_Init(CartInfo*);
+void Mapper563_Init(CartInfo*);
+void Mapper493_Init(CartInfo*);
+void Mapper731_Init(CartInfo*);
+void Mapper361_Init(CartInfo*);
+void Mapper366_Init(CartInfo*);
+void Mapper579_Init(CartInfo*);
+void Mapper581_Init(CartInfo*);
+void Mapper586_Init(CartInfo*);
+void Mapper588_Init(CartInfo*);
+void Mapper590_Init(CartInfo*);
+void Mapper592_Init(CartInfo*);
+void Mapper503_Init(CartInfo*);
+void Mapper504_Init(CartInfo*);
+void Mapper589_Init(CartInfo*);
+void Mapper591_Init(CartInfo*);
+void Mapper567_Init(CartInfo*);
+void Mapper573_Init(CartInfo*);
+void Mapper578_Init(CartInfo*);
+void Mapper583_Init(CartInfo*);
+void Mapper587_Init(CartInfo*);
+void Mapper506_Init(CartInfo*);
+void Mapper572_Init(CartInfo*);
+void Mapper570_Init(CartInfo*);
+void Mapper580_Init(CartInfo*);
+void Mapper585_Init(CartInfo*);
+void Mapper584_Init(CartInfo*);
+void Mapper574_Init(CartInfo*);
+void Mapper575_Init(CartInfo*);
+void Mapper576_Init(CartInfo*);
+void Mapper577_Init(CartInfo*);
+void Mapper239_Init(CartInfo*);
+void Mapper568_Init(CartInfo*);
+void Mapper569_Init(CartInfo*);
+void Mapper571_Init(CartInfo*);
+void Mapper566_Init(CartInfo*);
+void Mapper536_Init(CartInfo*);
+void Mapper537_Init(CartInfo*);
+void Mapper511_Init(CartInfo*);
+void Mapper512_Init(CartInfo*);
+void Mapper508_Init(CartInfo*);
+void Mapper509_Init(CartInfo*);
+void Mapper510_Init(CartInfo*);
+void Mapper507_Init(CartInfo*);
+void Mapper498_Init(CartInfo*);
+void Mapper499_Init(CartInfo*);
+void Mapper505_Init(CartInfo*);
+void Mapper490_Init(CartInfo*);
+void Mapper400_Init(CartInfo*);
+void Mapper491_Init(CartInfo*);
+void Mapper495_Init(CartInfo*);
+void Mapper273_Init(CartInfo*);
+void Mapper549_Init(CartInfo*);
+void Mapper582_Init(CartInfo*);
+void Mapper565_Init(CartInfo*);
+void Mapper557_Init(CartInfo*);
+void Mapper122_Init(CartInfo*);
+void Mapper552_Init(CartInfo*);
+void Mapper363_Init(CartInfo*);
+void Mapper418_Init(CartInfo*);
+void Mapper483_Init(CartInfo*);
+void Mapper514_Init(CartInfo*);
+void Mapper546_Init(CartInfo*);
+void Mapper548_Init(CartInfo*);
+void Mapper182_Init(CartInfo*);
+void Mapper595_Init(CartInfo*);
+void Mapper594_Init(CartInfo*);
+void Mapper611_Init(CartInfo*);
+void Mapper603_Init(CartInfo*);
+void Mapper605_Init(CartInfo*);
+void Mapper606_Init(CartInfo*);
+void Mapper607_Init(CartInfo*);
+void Mapper608_Init(CartInfo*);
+void Mapper609_Init(CartInfo*);
+void Mapper610_Init(CartInfo*);
+void Mapper612_Init(CartInfo*);
+void Mapper613_Init(CartInfo*);
+void Mapper614_Init(CartInfo*);
+void Mapper615_Init(CartInfo*);
+void Mapper616_Init(CartInfo*);
+void Mapper617_Init(CartInfo*);
+void Mapper618_Init(CartInfo*);
+void Mapper596_Init(CartInfo*);
+void Mapper597_Init(CartInfo*);
+void Mapper598_Init(CartInfo*);
+void Mapper599_Init(CartInfo*);
+void Mapper446_Init(CartInfo*);
+void Mapper561_562_Init(CartInfo*);
+void Mapper800_Init(CartInfo*);
+void INX_007T_Init(CartInfo* info);
+void GN45_Init(CartInfo *info); /* previously mapper 205 */
+void FFE_Init(CartInfo*);
+
+typedef struct {
+	const char *name;
+	int32 number;
+	void (*init)(CartInfo *);
+} BMAPPINGLocal;
+#endif

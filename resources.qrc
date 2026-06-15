@@ -1,0 +1,34 @@
+<!DOCTYPE RCC><RCC version="1.0">
+    <qresource>
+        <file>fceux.png</file>
+        <file>fceux1.png</file>
+        <file>icons/power.png</file>
+        <file>icons/media-record.png</file>
+        <file>icons/application-exit.png</file>
+        <file>icons/graphics-palette.png</file>
+        <file>icons/view-fullscreen.png</file>
+        <file>icons/input-keyboard.png</file>
+        <file>icons/input-gaming.png</file>
+        <file>icons/input-gaming-symbolic.png</file>
+        <file>icons/timer.png</file>
+        <file>icons/movie.png</file>
+        <file>icons/camera.png</file>
+        <file>icons/reticle.png</file>
+        <file>icons/debug-run.png</file>
+        <file>icons/debug-pause.png</file>
+        <file>icons/StepInto.png</file>
+        <file>icons/StepOver.png</file>
+        <file>icons/StepBack.png</file>
+        <file>icons/StepOut.png</file>
+        <file>icons/RunPpuFrame.png</file>
+        <file>icons/RunPpuHalfFrame.png</file>
+        <file>icons/RunPpuScanline.png</file>
+        <file>icons/arrow-cursor.png</file>
+        <file>icons/JumpTarget.png</file>
+        <file>icons/Undo.png</file>
+        <file>icons/find.png</file>
+        <file>icons/cloud.png</file>
+        <file>icons/branch_spritesheet.png</file>
+        <file>icons/taseditor-icon32.png</file>
+    </qresource>
+</RCC>

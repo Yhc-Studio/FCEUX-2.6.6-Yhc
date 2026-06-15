@@ -1,0 +1,118 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<title>OSX Building Documentation</title>
+<link href="fceux.css" rel="stylesheet" type="text/css" />
+<style type="text/css">
+
+.style1 {
+	float: right;
+	margin-right: 16px;
+	margin-top: 0px;
+	margin-left: 32px;
+	margin-bottom: 64px;
+}
+
+</style>
+</head>
+
+<body>
+<div id="masthead">
+	<span class="largerfont">FCEUX<br/></span>The all in one NES/Famicom/Dendy Emulator
+</div>
+<div id="top_nav">
+  <a href="home.html">Home</a>
+  <a href="download.html">Download</a>
+  <a href="documentation.html">Documentation</a>
+  <a href="version.html">Versions</a>
+  <a href="contact.html">Contact</a>
+  <a href="links.html">Links</a>
+</div>
+<div id="container">
+	<div id="left_col">
+		<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+		<ins class="adsbygoogle"
+	 		style="display:inline-block;width:180px;height:150px"
+	 		data-ad-client="ca-pub-0764229755985190"
+	 		data-ad-slot="7648866201"></ins>
+		<script>
+	     (adsbygoogle = window.adsbygoogle || []).push({});
+		</script>	
+		<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+		<ins class="adsbygoogle"
+	    	 style="display:inline-block;width:180px;height:150px"
+	     	data-ad-client="ca-pub-0764229755985190"
+	     	data-ad-slot="7648866201"></ins>
+		<script>
+	    	 (adsbygoogle = window.adsbygoogle || []).push({});
+		</script>
+	</div>
+	<div id="page_content">
+    To run FCEUX in Mac OSX, you must have the following library dependencies installed on your system:
+       <p>
+		 Qt5, SDL2, minizip, and zlib
+		 </p>
+		 <p>
+		 There are a few installation options:
+		 <ul>
+			 <li><p><b>--- Installing DMG package from the appveyor autobuild ---</b><br><br>
+		 The DMG package created by the appveyor autobuild should have all the necessary dependencies bundled into it. 
+		 So you only need to download it, perform the drag and drop install, and then it is ready for use. Since the application is not signed,
+		 you may need to tell the OS that you trust this application (one time operation) to give it permission to run.
+				 </p></li>
+				 <li><p><b>--- Installing via homebrew package manager ---</b><br><br>
+					 Homebrew can now be used to install the latest release or the current development revision (git head).<br><br>
+		 To install the latest release:
+		 <pre>
+		 brew install fceux
+		 </pre>
+		 To install the current development revision:
+		 <pre>
+		 brew install --HEAD fceux
+		 </pre></p></li>
+		 <li><p><b>--- Building from source ---</b><br><br>
+		 To build from source, you must install the necessary dependencies to your system. The easiest way to do 
+		 this is via the home brew package management tool. The following commands will install
+		 the necessary dependencies to allow for building from source:
+		 </p>
+		 <pre>
+		 brew install qt5
+		 brew install sdl2
+		 brew install minizip
+		 brew install libarchive (optional dependency for 7zip archive support)
+		 brew install ffmpeg (optional dependency but recommended for AVI recording)
+		 brew install x264   (optional dependency but recommended for AVI recording)
+		 </pre>
+		 Otherwise you can install the dmg packages available from the Qt and SDL websites. 
+		 <br><br>The following tools are required to build from source:
+		 <ul>
+			 <li>cmake</li>
+			 <li>make</li>
+			 <li>pkg-config</li>
+			 <li>bash</li>
+			 <li>C++ Compiler (clang or gcc)</li>
+		 </ul>
+		 <br>See the README file in the root directory of the project for build instructions.
+		 <br><br>You can also look at what is being done in the ./pipelines/macOS_build.sh
+		 script if you wish to build fceux in the same way the autobuild does.
+		 <br><br>If you wish to produce a debug build, then use the script:
+		 <pre>./scripts/unix_debug_build.sh</pre>
+		 </li>
+		 </ul>
+	</div>
+</div>
+
+<div id="footer">
+	<a href="home.html">Home</a> | <a href="download.html">Download</a> |
+	<a href="documentation.html">Documentation</a> | <a href="version.html">
+	Version History</a> | <a href="contact.html">Contact</a> | <a href="links.html">Links</a>
+	<br/>We are in no way affiliated or endorsed by Nintendo or Nintendo of America. "Nintendo" is a registered trademark of Nintendo of America Inc.
+	<br/>©2009 adelikat
+</div>
+
+
+</body>
+
+</html>

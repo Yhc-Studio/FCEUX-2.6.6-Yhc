@@ -1,0 +1,446 @@
+Y300系列更新日志：
+Y315
+Mapper更新：
+更新Mapper 78，增加圣魔术师的Submapper 3的支持，解决花屏问题，感谢Yave Yu
+更新ines-correct.h，修正一些Goodnes中游戏的镜像和Mapper的支持，感谢Yave Yu
+更新Namco 106，针对Submapper 2的游戏添加128B的读写SRAM的支持，感谢Yave Yu
+音频更新：
+增加DPCM反转功能，感谢Yave Yu
+修复音频后端的问题，切换默认播放设备后自动重开声音后端，无需手动开启Sound Enabled
+Sound Configuration 界面优化，增加扩展芯片音量调节与重置音量，并且可以自由输入数字更改音量
+NSF播放界面：总体相比原版FCEUX进行大改动，体验方面完爆原版
+增加A键暂停/继续，B键停止NSF，Start重新播放当前NSF
+增加状态和播放时间显示
+增加Vnes同款Wave View的波形显示
+增加Vnes同款KeyBoard的音符显示，后由Yave Yu进行进一步修正
+增加大于/小于60hz的NSF播放支持
+增加NSFe文件的支持
+增加FDS、VRC6/7、Sunsoft、N163的动态高亮支持
+增加SQ1、SQ2、TRI，NOI，DMC，FDS、VRC6/7、Sunsoft、N163的音量显示
+Wave View部分相比原来的Vnes，增加中心线，总波形，Peak Hold和RMS Level Bar的显示
+增加多个扩展芯片通道的混合播放支持，目前范围仅限两个和三个扩展芯片的组合，和NEZPlug持平，至于是否有更多情况请务必尝试并且反馈，感谢ggdjr、Yave Yu的测试
+其他更新：
+修改FCEUX的HUD字符映射问题，让其分开去映射，感谢Yave Yu
+修改默认VC调色板，参照Mesen2去设置Hue和亮度，感谢Yave Yu
+NSF Player 支持 AVI 录制
+修复FCEUX的保存机制，针对WAV和FM2文件，如果文件名相同，则需要提示是否替换而不是覆盖
+视频设置里增加PPU Mask开启的选项，可以随时开启/关闭PPU Mask 的左面8像素
+高分辨率DPI修正，针对每个显示器都有不同的DPI适应，避免模糊问题
+解除CPU0的调度限制，改成Windows自己调度，防止抢线程导致掉帧
+Y311
+添加Nes 2.0 Mapper 800，FlameCyclone_Mapper的支持，支持最大256MB+256MB的ROM
+Y310
+Mapper更新：
+支持MiscRom和MiscRomSize
+重写Mapper 6、8、12.1、17有关FFE Mapper的模拟，感谢NRS
+添加Nes 2.0 Mapper 596，FC-49的支持，感谢NRS
+添加Nes 2.0 Mapper 561，Bung Super Game Doctor的支持，感谢NRS
+添加Nes 2.0 Mapper 562，Venus Turbo Game Doctor的支持，感谢NRS
+添加Nes 2.0 Mapper 597，GN-27的支持，感谢NRS
+添加Nes 2.0 Mapper 598，3936的支持，感谢NRS
+添加Nes 2.0 Mapper 599，ET-133A的支持，感谢NRS
+添加Nes 2.0 Mapper 605，New Star TX5/8IN1的支持，感谢NRS
+添加Nes 2.0 Mapper 606，New Star T4IN1的支持，感谢NRS
+添加Nes 2.0 Mapper 607，4705的支持，感谢NRS
+添加Nes 2.0 Mapper 608，A-23的支持，感谢NRS
+添加Nes 2.0 Mapper 609，63-100的支持，感谢NRS
+添加Nes 2.0 Mapper 610，J-2042的支持，感谢NRS
+添加Nes 2.0 Mapper 612，K-3004的支持，感谢NRS
+添加Nes 2.0 Mapper 613，S5668 3366的支持，感谢NRS
+添加Nes 2.0 Mapper 614，New Star 9135的支持，感谢NRS
+添加Nes 2.0 Mapper 615，LB12in1的支持，感谢NRS
+添加Nes 2.0 Mapper 616，K-3044的支持，感谢NRS
+添加Nes 2.0 Mapper 617，AD-301的支持，感谢NRS
+添加Nes 2.0 Mapper 618，FC 4-in-1 (NS32)的支持，感谢NRS
+添加Nes 2.0 Mapper 446，SMD172B_FPGA的支持，感谢NRS
+更新Nes 2.0 Mapper 354，增加650-in-1的支持，感谢NRS
+更新Nes 2.0 Mapper 498，增加1MB+1MB的支持，感谢NRS
+更新Nes 2.0 Mapper 438，添加基于重置的Contra变体，感谢NRS
+更新Nes 2.0 Mapper 339，增加Submapper 4的支持，感谢NRS
+更新Nes 2.0 Mapper 277，针对UNROM的游戏，必须从NES头部获取镜像，感谢NRS
+更新Nes 2.0 Mapper 280，在512KB的情况下不切换模式，感谢NRS
+更新Nes 2.0 Mapper 301，更新模拟支持，感谢NRS
+更新Mapper 191，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 340，重写代码，感谢NRS
+更新Nes 2.0 Mapper 344，增加DIP Switch，感谢NRS
+更新Nes 2.0 Mapper 422，增加Submapper 3和Submapper 4的支持，感谢NRS
+更新Mapper 1，增加Submapper 7 和 8 的支持，移除 Mapper 171的支持，感谢NRS
+更新Nes 2.0 Mapper 447，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 487，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 341，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 441，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 571，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 331，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 340，增加Submapper 1的支持，针对B计划增加CHR-RAM写保护，感谢NRS
+更新Nes 2.0 Mapper 413，重写对应的模拟，感谢NRS
+更新Mapper 219，修复部分合卡的兼容性，感谢NRS
+更新Mapper 227，移除Submapper 3的部分，感谢NRS
+更新Nes 2.0 Mapper 268，增加Submapper 4和Submapper 8的支持，针对268.0和268.1增加64MB的支持，感谢NRS
+更新Nes 2.0 Mapper 339，增加Submapper 4的支持，更新Submapper 2，感谢NRS
+音频更新：
+增加从NRS模拟器移植过来的线性混音器，并且加入选项支持，感谢Yave Yu
+增加Not Reset Phase选项，不重置$4003与$4007的相位，和1类豆机看平，感谢Yave Yu
+改进 FDS 模块，实现 4030 地址第 3 位的读取功能，并对 fds_apu 的 mod/sweep 模拟进行更新，从 Mednafen NES 移植相关模拟逻辑并适配 FCEUmm 的 lq/hq 音频模式，虽时序精度无法完全保证，但在多数场景下音质相比旧版有明显提升。
+更新MMC5方波的音量设置，HQ模式和SQ模式的音量设定与Mesen看齐，感谢Yave Yu
+滤镜更新：
+增加Prescale 5x，6x，8x的支持，感谢Yave Yu
+兼容性更新：
+修改IRQ的设定，开机时禁用帧中断 (Frame IRQ)，与NRS模拟器和某些 FC 真机的行为一致，提高若干已知游戏的兼容性；而任何需要使用帧中断的游戏，无论如何都会显式启用该功能。感谢NRS。
+Y305
+增加Nes 2.0 Mapper 286，BS-5的支持
+更新Nes 2.0 Mapper 592，增加Submapper 1的支持
+增加Nes 2.0 Mapper 224，晶科泰 KT-008 的支持，指向Mapper 268
+增加Nes 2.0 Mapper 611，T-124/43-117/831049的支持，感谢NRS
+Y302
+修复在Hex Editor针对NES文件进行保存文件容量错误的BUG
+Y300
+更新Nes 2.0 Mapper 422，增加Submapper 3、4的支持，感谢NRS
+增加Nes 2.0 Mapper 594，Rinco FSG2的支持，感谢NRS
+增加Nes 2.0 Mapper 595，4M-512的支持，感谢NRS
+更新Nes 2.0 Mapper 458，增加Submapper 1的支持，感谢NRS
+更新Nes 2.0 Mapper 280，修复重制镜像的BUG，感谢NRS
+更新Nes 2.0 Mapper 464，从小蜜蜂返回到菜单，感谢NRS
+更新Nes 2.0 Mapper 396，增加Submapper 3的支持，感谢NRS
+添加Mapper 182，YH-001的支持，感谢NRS
+更新Mapper 176，支持卡比 13-in-1 和 Jingxuna Mali 25-in-1
+添加Nes 2.0 Mapper 461，CM-9309的支持，感谢NRS
+添加Nes 2.0 Mapper 548，CTC-15的支持，感谢NRS
+添加Nes 2.0 Mapper 546，03-101的支持，感谢NRS
+添加Nes 2.0 Mapper 514，Subor Karaode的支持，感谢NRS
+添加Nes 2.0 Mapper 483，3927的支持，感谢NRS
+添加Nes 2.0 Mapper 418，820106-C/821007C的支持，感谢NRS
+添加Nes 2.0 Mapper 363，5069的支持，感谢NRS
+添加Nes 2.0 Mapper 552，TAITO X1-017的支持，感谢NRS
+添加Mapper 122，JY043的支持，感谢NRS
+添加Nes 2.0 Mapper 557，NTDEC 2718的支持，感谢NRS
+添加Nes 2.0 Mapper 565，J-33-C的支持，感谢NRS
+添加Nes 2.0 Mapper 549，Kaiser KS-7016B的支持，感谢NRS
+添加Nes 2.0 Mapper 273，J-3?-C的支持，感谢NRS
+添加Nes 2.0 Mapper 495，N-46的支持，感谢NRS
+添加Nes 2.0 Mapper 400，8BIT-XMAS的支持，感谢NRS
+更新Mapper 30，增加Submapper 1,2,3的支持，感谢NRS
+添加Nes 2.0 Mapper 490，K-3101的支持，感谢NRS
+添加Nes 2.0 Mapper 491，Sane Ting 5-in-1的支持，感谢NRS
+更新Mapper 227，增加Submapper 3的支持，感谢NRS
+更新Nes 2.0 Mapper 339，增加Submapper 2，3，DIP Switch的支持，感谢NRS
+添加Nes 2.0 Mapper 498，K-3011的支持，感谢NRS
+添加Nes 2.0 Mapper 499，FC-41的支持，感谢NRS
+添加Nes 2.0 Mapper 505，5426757A-Y2-230630的支持，感谢NRS
+添加Nes 2.0 Mapper 507，A-018的支持，感谢NRS
+添加Nes 2.0 Mapper 508，JY-014的支持，感谢NRS
+添加Nes 2.0 Mapper 509，K-3022的支持，感谢NRS
+添加Nes 2.0 Mapper 510，FC-53A的支持，感谢NRS
+添加Nes 2.0 Mapper 511，1n4148的支持，感谢NRS
+添加Nes 2.0 Mapper 512，Zhonggguo Daheng的支持，感谢NRS
+添加Nes 2.0 Mapper 536，N42S-2的支持，感谢NRS
+添加Nes 2.0 Mapper 537，JY4M4的支持，感谢NRS
+添加Nes 2.0 Mapper 566，ET-149的支持，感谢NRS
+添加Nes 2.0 Mapper 568，T-227的支持，感谢NRS
+添加Nes 2.0 Mapper 569，820315-C的支持，感谢NRS
+添加Nes 2.0 Mapper 571，JC-011的支持，感谢NRS
+添加Mapper 213，EJ-3003/820428-C的支持，指向新的Mapper，感谢NRS
+添加Mapper 239，OK-043的支持，感谢NRS
+添加Nes 2.0 Mapper 573，5068的支持，感谢NRS
+添加Nes 2.0 Mapper 574，FC-40的支持，感谢NRS
+添加Nes 2.0 Mapper 575，W-03的支持，感谢NRS
+添加Nes 2.0 Mapper 576，J-2096的支持，感谢NRS
+添加Nes 2.0 Mapper 577，KN-29的支持，感谢NRS
+更新Nes 2.0 Mapper 285，增加DIP Switch，移除旧版本A65AS的模拟，感谢NRS
+添加Nes 2.0 Mapper 584，ST-32的支持，感谢NRS
+添加Nes 2.0 Mapper 585，FE-01-1的支持，感谢NRS
+更新Mapper 61，增加Submapper 1的支持，感谢NRS
+添加Nes 2.0 Mapper 580，ET-156的支持，感谢NRS
+添加Nes 2.0 Mapper 570，9052的支持，感谢NRS
+添加Nes 2.0 Mapper 572，F-648的支持，感谢NRS
+添加Nes 2.0 Mapper 506，GA-009的支持，感谢NRS
+添加Nes 2.0 Mapper 587，3355的支持，感谢NRS
+更新Nes 2.0 Mapper 280，增加Submapper 1的支持，支持235-in-1，感谢NRS
+添加Nes 2.0 Mapper 583，8203的支持，感谢NRS
+添加Nes 2.0 Mapper 578，910610的支持，感谢NRS
+更新Nes 2.0 Mapper 327，对Submapper 1进行支持，用于马里奥4的单屏镜像
+更新Nes 2.0 Mapper 394
+添加Nes 2.0 Mapper 567，Top Ten Variety (SF III)的支持，感谢NRS
+更新Mapper 178，对Submapper 3进行支持，感谢NRS
+添加Nes 2.0 Mapper 591，07027/810543的支持，感谢NRS
+添加Nes 2.0 Mapper 589，810706的支持，感谢NRS
+添加Nes 2.0 Mapper 504，K-3054的支持，感谢NRS
+添加Nes 2.0 Mapper 503，ET-170的支持，感谢NRS
+添加Nes 2.0 Mapper 581，ET-82的支持，感谢NRS
+添加Nes 2.0 Mapper 590，810430的支持，感谢NRS
+更新Nes 2.0 Mapper 435，支持DIP Switch，感谢NRS
+添加Nes 2.0 Mapper 592，8 in 1 1991的支持，感谢NRS
+添加Nes 2.0 Mapper 588，ET-81的支持，感谢NRS
+添加Nes 2.0 Mapper 579，T-215的支持，感谢NRS
+添加Nes 2.0 Mapper 586，HN-02的支持，感谢NRS
+更新Nes 2.0 Mapper 314，支持4MB的ROM，并更新NRS支持的ROM，感谢NRS
+重写Nes 2.0 Mapper 445、556，更新ASIC_MMC3、vrc2and4的支持，感谢NRS
+重写Nes 2.0 Mapper 351，更新ASIC_mmc1、MMC3、vrc2and4的支持，感谢NRS
+重写Nes 2.0 Mapper 361、366，更新ASIC_MMC3的支持，感谢NRS
+重写Mapper 21、22、23、25 的模拟，更新Asic_vrc2and4的支持，移除旧版本VRC2、4的支持，感谢NRS
+重写Nes 2.0 Mapper 308、450、451、520、525、529、542、544、559、563、384、398、447、308，均同步更新对Asic_vrc2and4的支持，移除旧版本VRC2、4的支持，感谢NRS
+增加Cartram部分的定义和代码，与NRS版本的FCEUMM保持一致
+增加Asic_latch部分的定义和代码，与NRS版本FCEUMM保持一致
+增加Asic_TC3294部分的定义和代码，与NRS版本FCEUMM保持一致
+增加Asic_vrc2and4部分的定义和代码，并修复OAM的渲染BUG
+增加Asic_MMC3部分的定义和代码，与NRS版本FCEUMM保持一致
+增加Asic_MMC1部分的定义和代码，与NRS版本FCEUMM保持一致
+完善Nes 2.0 Mapper 439，修复载入文件的时候不进入菜单的Bug
+更新版本号到Y300
+Y295
+添加Nes 2.0 Mapper 494，CH512K的支持，感谢NRS
+添加Nes 2.0 Mapper 731，ET-156的支持，感谢NRS
+重写Nes 2.0 Mapper 406，维持MMC3的同时，增加flashrom的模拟，感谢NRS
+添加Nes 2.0 Mapper 563，J-2020的支持，感谢NRS
+添加Nes 2.0 Mapper 559，Subor Sango II的支持，感谢NRS
+添加Nes 2.0 Mapper 544，WAIXING FS306的支持，感谢NRS
+添加Nes 2.0 Mapper 542，JYV610 830626C的支持，感谢NRS
+添加Nes 2.0 Mapper 520，YuYuHakusho+DBZ的支持，感谢NRS
+添加Nes 2.0 Mapper 450，YY841157C的支持，感谢NRS
+添加Nes 2.0 Mapper 447，KL-06的支持，感谢NRS
+重写Nes 2.0 Mapper 398 的模拟，感谢NRS
+添加Nes 2.0 Mapper 384，L1A16的支持，感谢NRS
+添加Nes 2.0 Mapper 558，YC-03-09的支持，增加EEPROM的模拟，感谢NRS
+重写Nes 2.0 Mapper 529，UNLT230的支持，增加EEPROM的模拟，感谢NRS
+添加eeprom_93Cx6的模拟，对采用EEPROM的Mapper做支持，感谢NRS
+重写VRC2，VRC4的模拟方法，移除原有的VRC2、VRC4的模拟，感谢NRS
+重写Mapper 21、22、23、25 的模拟
+重写Nes 2.0 Mapper 308，UNL-TH21311的支持，感谢NRS
+重写Nes 2.0 Mapper 524，BTL-900218的支持，感谢NRS
+重写Nes 2.0 Mapper 525，UNL-KS7021A的支持，感谢NRS
+Y292
+增加Nes 2.0 Mapper 737，K-3011的支持，感谢NRS
+增加Nes 2.0 Mapper 474，NTDEC N625231的支持，感谢NRS
+增加Nes 2.0 Mapper 492，K-3069/12-28的支持，感谢NRS
+增加Nes 2.0 Mapper 488，HC001的支持，感谢NRS
+增加Nes 2.0 Mapper 486，KS7006的支持，感谢NRS
+完善Nes 2.0 Mapper 485，优化代码，感谢NRS
+增加Nes 2.0 Mapper 482，K-1079的支持，感谢NRS
+增加Nes 2.0 Mapper 480，480的支持，感谢NRS
+完善Nes 2.0 Mapper 478，优化代码，感谢NRS
+完善Nes 2.0 Mapper 315，优化模拟，感谢NRS
+增加Nes 2.0 Mapper 477，15-in-1的支持，感谢NRS
+完善Nes 2.0 Mapper 475，476的代码，感谢NRS
+完善Mapper 61，Mapper 174，解决选择Galaxian之后，也要正确重置为菜单的BUG，感谢NRS。
+完善Nes 2.0 Mapper 416，加入重设菜单的支持，感谢NRS
+增加Nes 2.0 Mapper 484，ESTIQUE的支持，感谢NRS
+增加Nes 2.0 Mapper 399，BATMAP-000的支持，感谢NRS
+增加Nes 2.0 Mapper 489，N-80的支持，感谢NRS
+完善Mapper 176，修改SubType的判定逻辑，保持和NRS模拟器判定一致
+增加Nes 2.0 Mapper 327，修复部分游戏花屏的问题，感谢NRS
+增加Nes 2.0 Mapper 494，CH512K的支持，感谢NRS
+完善Mapper 242，CHR-RAM更改为FCEUX原始定义，解决部分Rom的花屏问题
+Y290
+完善Mapper 47，增加submapper 1的支持，感谢NRS
+完善Nes 2.0 Mapper 288，DIP Switch增加到15，增加设定镜像设置，感谢NRS
+完善Nes 2.0 Mapper 289，增加DIP Switch的支持，感谢NRS
+完善Mapper 61，增加重设选项，感谢NRS
+完善Nes 2.0 Mapper 454，优化模拟，增加重设选项，感谢NRS
+完善Nes 2.0 Mapper 285，优化模拟，增加重设选项，感谢NRS
+完善Nes 2.0 Mapper 543，修复合卡菜单的BUG，感谢NRS
+增加Nes 2.0 Mapper 481，045N的支持，感谢NRS
+完善mapper 52.14，修复AB-115中的无意义二进制位的问题，感谢NRS
+完善Nes 2.0 Mapper 460，感谢NRS
+增加Nes 2.0 Mapper 487，AVE NINA-08的支持，感谢NRS
+完善Mapper 237，修复错误的DIP Switch，更新模拟，感谢NRS
+完善Nes 2.0 Mapper 414，增加DIP Switch的支持，感谢NRS
+完善Nes 2.0 Mapper 339，增加submapper 1的支持，感谢NRS
+完善Nes 2.0 Mapper 336，增加submapper 1和2的支持，感谢NRS
+完善Nes 2.0 Mapper 441，为AB-209增加PRG-RAM的支持，感谢NRS
+完善Nes 2.0 Mapper 394，增加submapper 1的支持，修正软复位时从JY切换到MMC3模式的问题，感谢NRS
+完善Nes 2.0 Mapper 422，支持2 MiB CHR-ROM变种的ROM，感谢NRS
+完善Nes 2.0 Mapper 331，增加重设菜单选项，感谢NRS
+完善Mapper 174，增加重设菜单选项，感谢NRS
+完善Nes 2.0 Mapper 333，增加重设菜单选项，感谢NRS
+完善Nes 2.0 Mapper 280，完善模拟，感谢NRS
+完善Nes 2.0 Mapper 367，与Mapper 205融合，感谢NRS
+完善Nes 2.0 Mapper 392，完善模拟，感谢NRS
+增加Nes 2.0 Mapper 473，KJ01A-18的支持，感谢NRS
+完善Nes 2.0 Mapper 472，完善模拟，感谢NRS
+完善Nes 2.0 Mapper 462，完善模拟，感谢NRS
+增加Nes 2.0 Mapper 445，DG574B的支持，增加VRC4的支持，感谢NRS
+完善Nes 2.0 Mapper 268，解决BBC 400-in-1合卡的花屏问题，感谢NRS
+Y285
+完善Mapper 40，增加40.1 NTDEC 2722的支持，感谢NRS
+完善Nes 2.0 Mapper 564，增加AXROM的支持，感谢NRS
+完善Nes 2.0 Mapper 432，增加432.3，增加真人快打2特别版的支持，感谢NRS
+增加Nes 2.0 Mapper 545，ST-80的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 735，5426757A-Y2-230630的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 733，K-3054的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 746，ET-82的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 749，ST-32的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 751，T-215的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 732，W-03的支持（Beta测试版），感谢NRS
+增加Mapper 237，Teletubbies 420-in-1的支持，感谢NRS
+增加Nes 2.0 Mapper 485，0359的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 478，WE7HGX的支持，感谢NRS
+增加Nes 2.0 Mapper 475，820215-C-A2的支持（Beta测试版），感谢NRS
+增加Nes 2.0 Mapper 352，Reset-based NROM-256的支持，感谢NRS
+Y284
+更新Nes 2.0 Mapper 441，增加WRAM支持，修复超级马里奥3无法启动的问题
+增加Nes 2.0 Mapper 739，FE-01-1的支持（Beta测试版），感谢NRS
+更新Mapper 202，SP60 150-in-1的支持，感谢NRS
+增加Nes 2.0 Mapper 451，Haratyler HP/MP的支持，感谢negativeExponent
+增加Nes 2.0 Mapper 471，Impact Soft IM1的支持，感谢negativeExponent
+更新MMC5，修复Chr Bank和命名表的初始值，感谢negativeExponent
+更新PRG在Code Data Logger的写入，修复FDS RAM涉及到的内存控制器PRG写入问题，感谢parasyte
+更新Debugger模块，修复地址$FFFF处未显示“OVERFLOW”字节，感谢parasyte
+Y283
+更新BMC-FK23C, BMC-FK23CA，修复洛克人6合一的兼容性问题
+更新Nes 2.0 Mapper 464，修复部分兼容性问题
+增加CHINA_ER_SAN2的UNIF支持，归属Mapper 19。
+更新Nes 2.0 Mapper 519，UNL-EH8813A的支持，修复部分兼容性问题
+Y282
+更新Nes 2.0 Mapper 260，Hpxx的支持，修复部分游戏没办法进入的问题
+Y281
+增加Nes 2.0 Mapper 754，N42S-2的支持，感谢NRS
+增加Nes 2.0 Mapper 738，K-3091/GN-16的支持，感谢NRS
+增加Nes 2.0 Mapper 736，GA-009的支持，感谢NRS
+增加Nes 2.0 Mapper 367，JC-016-2 variant的支持，感谢NRS
+增加Nes 2.0 Mapper 373，SFX-13的支持，感谢NRS
+Y280
+更新Nes 2.0 Mapper 287，支持INES Mapper号，且修复部分合卡遇到的菜单花屏问题，感谢NRS。
+更新Nes 2.0 Mapper 134，支持1MB+1MB的合卡支持，DIP菜单范围从7到15，感谢NRS。
+增加Grayscale，Kitrinx，KizulDefinitive的调色板，感谢Yave Yu的提供。
+Y279
+增加Nes 2.0 Mapper 759，5068的支持，感谢NRS
+Y278
+更新Nes 2.0 Mapper 344，修复电源重启的问题。
+Y277
+更新Nes 2.0 Mapper 289，BMC-60311C的支持，添加Super 76-in-1 Contra的支持，感谢NRS
+更新Nes 2.0 Mapper 344，BMC-GN26的完善支持，感谢NRS
+Y276
+增加Mapper 81，Super Gun (NTDEC N715021)的支持
+Y275
+增加Nes 2.0 Mapper 555，NES-EVENT2的支持，感谢NRS
+增加Nes 2.0 Mapper 277，09-078的支持，感谢NRS
+增加Nes 2.0 Mapper 420，A971210的支持，感谢NRS
+修改MMC3.h以及MMC3.cpp，增加对Work Ram的写判断。
+更新Nes 2.0 Mapper 430，优化代码，感谢NRS
+更新Nes 2.0 Mapper 453，从datalatch中分离，感谢NRS
+更新Nes 2.0 Mapper 457，优化代码，感谢NRS
+添加Nes 2.0 Mapper 458，GN-23的支持，感谢NRS
+添加Nes 2.0 Mapper 551，KT-xxx的支持，感谢NRS
+添加Nes 2.0 Mapper 362，830506C的支持，感谢NRS
+添加Nes 2.0 Mapper 398，晶太YY840820C的支持，感谢NRS
+更新Nes 2.0 Mapper 454，优化代码，感谢NRS
+增加Mapper 128，1994 Super HiK 4-in-1的支持，感谢NRS
+更新Bandai Board，针对SD高达骑士2的EEPROM问题修复X24C02的BUG，感谢thor2016
+Y270
+更新Mapper 44，修复Reset无法回到菜单的问题
+更新Mapper 221，添加Submapper 1 的支持，感谢NRS
+更新Mapper 115，添加合卡功能，感谢NRS
+更新Mapper 52，针对Submapper 14的CHRRAM部分做移除，感谢NRS
+更新Mapper 47，支持更大的PCB合卡，重置为菜单，感谢NRS
+更新Nes 2.0 Mapper 288，PRG和CHR去掉掩码数值，感谢NRS
+更新Mapper 242，修正ET-187、Xing-2462的DIP Switch数值，修复在Power On的情况下的DIP Switch的开关，感谢NRS
+更新Mapper 227，DIP Switch仅用于Submapper 1，修复在Power On的情况下的DIP Switch的开关，感谢NRS
+更新Mapper 201，简化并修正开机后的数值。在NRS源码注释中，CF-043合卡不需要submapper，故移除Submapper 15；针对CF-043做开机后的映射方向修复，感谢NRS。
+更新Mapper 200，修正开机后的数值，感谢NRS
+更新Mapper 61，添加CHR-ROM的支持，感谢NRS
+更新Nes 2.0 Mapper 432，对Submapper做映射处理，感谢NRS
+更新Nes 2.0 Mapper 417，对Submapper 1、5做改进，感谢NRS
+更新Nes 2.0 Mapper 412，增加DIP Switch的读取，重构代码，感谢NRS
+更新Nes 2.0 Mapper 411，增加Submapper 1、2，感谢NRS
+更新Nes 2.0 Mapper 364，针对(LT-953)合卡更改操作地址从6000~7fff到7000~7fff，感谢NRS
+更新Nes 2.0 Mapper 360，增加Submapper 1，感谢NRS
+增加Nes 2.0 Mapper 256，Onebus部分添加VT02/VT03的部分游戏支持，感谢NRS。
+更新Mapper 45，支持VRAM游戏，修复Mapper 45.1的菜单花屏问题，感谢NRS。
+修复Mapper 45在拖入ROM及电源重启中死机的问题。
+更新Nes 2.0 Mapper 541，重构代码，感谢NRS
+更新Nes 2.0 Mapper 330，重构代码
+更新Nes 2.0 Mapper 268，支持Submapper 10/11，感谢NRS
+更新Nes 2.0 Mapper 422，修复马里奥3以及CNROM的问题，感谢NRS
+更新Nes 2.0 Mapper 351，修复科乐美世界2的BUG，感谢NRS
+添加latch.c和latch.cpp，单独将涉及到寄存器的合卡Mapper拿出来管理，感谢NRS
+添加Nes 2.0 Mapper 448，830768C的支持，感谢NRS
+添加Nes 2.0 Mapper 556，JY-215的支持，感谢NRS
+添加vrcirq.c和vrcirq.cpp，单独将涉及到VRC IRQ的Mapper拿出来管理，感谢NRS
+添加Nes 2.0 Mapper 528，831128C的支持，感谢NRS
+更新Nes 2.0 Mapper 500,501,502，重构代码，感谢NRS
+更新Nes 2.0 Mapper 265，增加Tetris II in 11-in-1的支持，感谢NRS
+更新Mapper 4，MMC3考虑NES 2.0标头WRAM大小，感谢ClusterM
+修改版本号为Y270
+Y260
+更换开发平台，从VS2017改成VS2022。
+完善Mapper 30，将支持的PRG-ROM大小从2MB扩大到4MB，感谢@negativeExponent
+重写iNESLoad函数，修复prg大小低于16K的rom的处理，支持Misc Rom，支持PRG和CHR的CRCR32查看，感谢@negativeExponent
+增加Nes 2.0 Mapper 413，Super Russian Roulette的支持，感谢@negativeExponent
+增加Nes 2.0 Mapper 280，K-3017的支持，感谢NRS。
+完善Nes 2.0 Mapper 268，添加 UNF 判断机制，解决没有 Wram 的问题。
+增加 268.0~268.9 分支合卡，感谢NRS。
+完善Nes 2.0 Mapper 268，为268.0合卡，增加PRG+CHR的支持，感谢NRS
+增加Nes 2.0 Mapper 378，8-in-1 AOROM+UNROM的支持，感谢NRS
+增加Nes 2.0 Mapper 379，35-in-1的支持，感谢NRS
+增加Nes 2.0 Mapper 564，bd23.pcb的支持，感谢NRS
+增加Nes 2.0 Mapper 343，21-in-1的支持，感谢NRS
+完善Nes 2.0 Mapper 116，UNLSL12的支持，支持 瑪莉家族大集合 5-in-1 合卡
+更新Nes 2.0 Mapper 285，A65AS的支持，增加JY-066的支持，感谢NRS
+增加Nes 2.0 Mapper 740，N-80的支持，感谢NRS
+完善Nes 2.0 Mapper 176，每次载入ROM的时候，不保留之前的dipswitch的数值
+增加Nes 2.0 Mapper 763，BS-N032的支持，感谢NRS
+增加Nes 2.0 Mapper 743，HN-02的支持，感谢NRS
+增加Nes 2.0 Mapper 739，HC004 LV103的支持，感谢NRS
+增加Nes 2.0 Mapper 476，Croaky Karaoke的支持，感谢NRS
+完善Nes 2.0 Mapper 203，35-in-1的支持，感谢NRS
+调色盘方面，分成两个目录，一个是Emulator目录，已经放好了常见模拟器的调色盘。另外一个是Wild目录，放第三方的调色盘，分ID名保存文件夹目录和调色盘文件，第三方和部分模拟器的调色盘文件也感谢 Yave Yu 提供。
+修改版本号为Y260
+Y255
+完善Nes 2.0 Mapper 268，使用FCEUX 2.5版本代码，将SRAM还原到16KB.
+完善Nes 2.0 Mapper 176，电源重启的时候，重置Dip Switch为0
+完善Nes 2.0 Mapper 439，增加BMC-DS-07的UNF识别
+Y250
+更换基础版本，从原 FCEUX 2.6.5 到新 FCEUX 2.6.6 版本
+完善Nes 2.0 Mapper 342，Coolgirl的支持，感谢ClusterM
+将之前修改版本的 Mapper 代码全部移植到新的 Y250 中
+修改FCEUX的标题为FCEUX 2.6.6-Y250
+完善Nes 2.0 Mapper 176，523的存档代码重构
+完善Mapper 178的存档代码重构，修复Mapper 178的重启问题。
+增加Nes 2.0 Mapper 308，UNL-TH21311的支持
+增加Nes 2.0 Mapper 525，UNL-KS7021A的支持
+增加Nes 2.0 Mapper 524，BTL-900218的支持
+修复Mapper 217的花屏问题，感谢NRS
+增加Nes 2.0 Mapper 402，J2282的支持
+增加Mapper 60的支持，将原Mapper 60重定义为Mapper 59，增加Resetnromxin1的支持，感谢NRS。
+完善Mapper 233的支持，更换其为42in1ResetSwitch
+移除bmc70in1.cpp，将70in1、70in1B归类为Mapper 236
+增加WAIXING-FW01，WAIXING-FS005的支持
+改善STREETFIGTER-GAME4IN1的支持
+增加BMC-830134C的支持，感谢NRS
+增加BMC-KG256的支持，感谢NRS
+增加Nes 2.0 Mapper 271，22026的支持，感谢NRS
+增加Nes 2.0 Mapper 474，Akerasoft NROM3XX的支持，感谢Dragon2Show
+完善Nes 2.0 Mapper 412，恒格 FK-206 JG的支持，支持256+256的Rom，修复26-in-1的赛车花屏的问题。
+Y225
+更改Nes 2.0 Mapper 412，重新命名为恒格 FK-206 JG，并且重新修改模拟方式，感谢NRS
+更改Nes 2.0 Mapper 472，重新命名为830947，并且重新修改模拟方式，增加DIP Switch，感谢NRS
+Y220
+增加Nes 2.0 Mapper 472，恒格 FK-206 JG的支持，感谢NRS
+完善Mapper 126, Mapper 422, Mapper 534的支持，感谢NRS
+完善Nes 2.0 Mapper 449，增加DIP Switch，感谢NRS
+完善Mapper 227，增加DIP Switch，感谢NRS
+完善Mapper 242，增加DIP Switch，感谢NRS
+完善Nes 2.0 Mapper 380，增加DIP Switch 和 SubMapper 1，感谢NRS
+完善Mapper 197，增加SubMapper 0，1，2，3 的支持，感谢NRS
+完善Mapper 63的支持，添加SubMapper 1，感谢NRS
+完善Mapper 200的支持，添加SubMapper 1，感谢NRS
+完善Mapper 201的支持，添加SubMapper 15，感谢NRS
+完善Mapper 52的支持，添加SubMapper 14，感谢NRS
+增加Nes 2.0 Mapper 430，831031C/T-308的支持，感谢NRS。
+增加Nes 2.0 Mapper 457，810431C的支持，感谢NRS。
+增加Nes 2.0 Mapper 745，JY-014的支持，感谢NRS。
+增加Nes 2.0 Mapper 747，K-3022的支持，感谢NRS。
+增加Nes 2.0 Mapper 750，FC-53A的支持，感谢NRS。
+增加Nes 2.0 Mapper 765，820315-C的支持，感谢NRS。
+增加Nes 2.0 Mapper 764，43-236/841134C的支持，感谢NRS。
+修改FCEUX的默认绘制分辨率为256x240，直接开启240线。
+修改FCEUX的标题为FCEUX 2.6.5-Y220
+Lua方面，加入FCEUXTimerNTSC.lua，FCEUXTimerPAL.lua，FCEUXTAStimerNTSC.lua，FCEUXTAStimerPAL.lua，完善SoundDisplay2 hele.lua和SoundDisplay2PAL.lua
+调色盘方面，加入其他模拟器的调色盘，方便切换。
+Y202
+完善Nes 2.0 Mapper 342，Coolgirl的支持，修复读档花屏问题，感谢Cluster
+Y201
+完善Nes 2.0 Mapper 354，增加CHR-RAM的写保护程序，感谢NRS。
+完善Nes 2.0 Mapper 435，更改寄存器为地址寄存器，增加CHR-RAM的写保护，感谢NRS。
+Y200
+更换基础版本，从原 FCEUX 2.2.3 到新 FCEUX 2.6.5 版本
+将之前修改版本的 Mapper 代码全部移植到新的 Y200 中

@@ -1,0 +1,159 @@
+FCEUX SDL 2.6.4 SDL README
+==========================
+Originally By Lukas Sabota (sf: punkrockguy318)
+Updated By mjbudd77
+
+[NOTE:  This only applies to Qt/SDL builds]
+
+https://fceux.com
+
+Last Modified: April 30, 2023
+
+Table of Contents
+-----------------
+
+1.  Requirements
+2.  Installation
+3.  Compile-time options
+4.  GUI
+5.  LUA Scripting
+5.  FAQ
+6.  Contact
+
+1 - Requirements
+----------------
+* sdl2  - Version >= 2.0  (sdl2 >= 2.8 recommended)
+* cmake - Required to build fceux. (cmake >= 3.8 recommended)
+* qt5 OR qt6  - (qt version >= 5.11 recommended)
+	- Required Qt Modules: Widgets and OpenGL
+	- Optional Qt Modules: Help
+* liblua5.1 (optional) - Will statically link internally if the system cannot provide this.
+* libx264 (optional) - H.264 video encoder for avi recording (recommended)
+* libx265 (optional) - H.265 video encoder for avi recording (recommended)
+* ffmpeg libraries (optional) - for avi recording (recommended)
+*	- ffmpeg libraries used: libavcodec  libavformat  libavutil  libswresample  libswscale
+* libarchive (optional) - for 7zip archive support (test with version 3.4.0)
+* minizip  
+* zlib  
+* openGL
+* c++ compiler -- you may use g++ from gcc or clang++ from llvm or msvc 2019
+
+2 - Installation
+----------------
+The old scons build system is no longer supported.
+Fceux can be compiled and built using the cmake build system.  To compile, run:
+
+	mkdir build; cd build;
+   cmake  -DCMAKE_INSTALL_PREFIX=/usr  -DCMAKE_BUILD_TYPE=Release  ..    # For a release build
+
+To build a binary with debug information included in it:
+   cmake  -DCMAKE_INSTALL_PREFIX=/usr  -DCMAKE_BUILD_TYPE=Debug    ..    
+
+The Qt version of the GUI builds by default and this is the preferred GUI for use. 
+For those who must have GTK/Gnome style, there is a GTK style plugin for Qt that 
+can be installed to the OS and selected for use via the GUI.
+The previous GTK version of the GUI is now retired and has been removed from the build.
+
+The Qt version GUI by far exceeds the old GTK gui in capability and performance.
+The Qt GUI can build/link against both Qt5 and Qt6. To enable building against Qt6, use -DQT6=1 argument:
+   cmake  -DCMAKE_INSTALL_PREFIX=/usr  -DQT6=1  -DCMAKE_BUILD_TYPE=Debug    ..    
+
+To do the actual compiling:
+   make
+
+To compile faster with multiple processes in parallel:
+   make -j `nproc`
+	
+After a sucessful compilation, the fceux binary will be generated to 
+./build/src/fceux .  You can install fceux to your system with the following command:
+
+	sudo make install
+
+By default cmake will use an installation prefix of /usr/local.
+The recommended installation prefix is /usr (this is where the installed fceux.desktop file expects everything to be)
+
+You can choose to install the lua scripts (located in output/luaScripts) to a directory of your choosing:
+
+	cp -R output/luaScripts /usr/local/some/directory/that/i/will/find/later
+
+If you would like to do a full clean build a 'make clean' like function, you can do either of following:
+
+   make clean    # from inside build directory
+
+OR:
+	Delete build directory and start over at initial cmake step:
+   rm -rf build;
+
+3 - Compile-time options
+------------------------
+You can enable and disable certain features of fceux at build time. 
+Look in the src/CMakeList.txt file to tweak options.
+
+4 - GUI
+-------
+The Qt GUI is required and automatically builds as part of the build. The Qt GUI is the default.
+When invoking cmake, Qt6 can be used (instead of Qt5) by specifying a -DQT6=1 on the command line.
+See above build instructions.
+OpenGL options:
+For Linux builds, the OpenGL library preference can be either GLVND or LEGACY (default). 
+To use GLVND OpenGL, add a -DGLVND=1 on the cmake command line.
+
+Qt Help Engine options:
+The GUI supports both online and offline documentation options.
+Online documentation requires an internet connection and a browser.
+Qt supports an help engine that can read compiled html files (made via the Qt qhelpgenerator tool),
+these files can reside locally on ones computer and be accessed by the GUI using the Qt help engine module.
+The Qt help engine is an optional dependency and can be enabled in the build by
+adding a -DQHELP=1 on the cmake command line.
+
+Qt Styling Options:
+The Qt GUI can use custom Qt widget styling by providing it a Qt stylesheet file.
+Use the GUI config window to set style options.
+
+5 - LUA Scripting
+-----------------
+FCEUX provides a LUA 5.1 engine that allows for in-game scripting capabilities.  LUA is enabled either way. It is just a matter of whether LUA is statically linked internally or dynamically linked to a system library.
+
+A collection of LUA scripts are provided with the source distribuition in the output directory:
+
+	$source_directory/output/luaScripts
+
+You should be able to run most of the scripts in this directory out of the box.  However, some of the the lua scripts require functionality from the "auxlib.lua" library.  This file can be copied from "./bin/auxlib.lua" or "./src/auxlib.lua".  You will need to place this file in the LUA library search path if a script bombs out looking for auxlib.lua. If the script bombs out, the console output will let you know what the search path are (/usr/local/lib/lua/5.1/ on my particular system).  You can simply copy the auxlib to a preferred location to utilize the functions in the auxiliary lua library. 
+
+In addition, some of the lua scripts require functionality from the "iup" GUI library.  You can obtain binaries and source for "iup" upstream (http://www.tecgraf.puc-rio.br/iup/), but I would recommend obtaining packages from your Linux distribution if you are able, as it can be difficult to compile or get the binaries working correctly on a given system.
+
+You will need to add the location that the libiup*.so files to the LUA_CPATH.  This can be done with the following command (please note that the location where iup is installed with vary based on how you installed iup):
+
+	export LUA_CPATH="/path/to/iup/lib/lib?51.so;"
+
+For example, if libiuplua51.so is located in '/usr/lib', you can run the following command before executing fceux to place the library in the search path:
+
+	export LUA_CPATH="/usr/lib/lib?51.so;"
+
+Finally, if any scripts complaints about "attempt to index global 'iup' (a nil value)", this means that "iup" needs to be explicitly loaded into the script.  You can add the following line to the head of script to manually load "iup":
+
+	require("iuplua")
+
+The latest version of iup (3.5 at the time of writing) is recommended.
+
+6 - FAQ
+-------
+
+* Q.  Im having issues with my sound!
+* A.  Try different SDL audio drivers to see if this makes any difference.  You can do this by using this command before running fceux:
+
+	export SDL_AUDIODRIVER=driver
+
+where driver is either: 'pulse' for pulseaudio;' alsa' for ALSA; 'dsp' for OSS; 'esd' for ESD; see SDL documentation for details (http://www.libsdl.org/docs/html/sdlenvvars.html)
+
+There are sound options that you can tweak at runtime through command line switches:
+
+* -soundq x 		internal sound quality hack value (0 off)
+* -soundrate x    	sound rate (sane values: 28000 48000
+* -soundbuffersize x 	(in ms)  sane values (30, 50, 100, 120)
+
+Running fceux through esddsp is known to fix some audio issues with pulseaudio on some older Ubuntu versions.
+	
+7 - Contact
+-----------
+If you have an issue with fceux, report it in the github bug tracker (see fceux at github.com).  If you would like to contact the author of this readme personally, e-mail LTsmooth42 <at> gmail <dot> com.  You can also check us out at #fceu on irc.freenode.net.
