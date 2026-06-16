@@ -343,11 +343,10 @@ static void ConvertFCM(HWND hwndOwner)
 
 void CalcWindowSize(RECT *al)
 {
+	// Keep window size and input mapping based on the NES logical width.
+	// NTSC 2x has a wider internal buffer, but it should not change the
+	// visible aspect ratio or mouse coordinate scale.
 	int xres = 256;
-	if(fullscreen && vmodes[0].special==3)
-		xres=301;
-	if(!fullscreen && winspecial==3)
-		xres=301;
 
 	double screen_width = VNSWID_NU(xres);
 	double screen_height = FSettings.TotalScanlines();
@@ -1217,11 +1216,10 @@ void GetMouseData(uint32 (&md)[3])
 {
 	extern RECT bestfitRect;
 
+	// Keep window size and input mapping based on the NES logical width.
+	// NTSC 2x has a wider internal buffer, but it should not change the
+	// visible aspect ratio or mouse coordinate scale.
 	int xres = 256;
-	if(fullscreen && vmodes[0].special==3)
-		xres=301;
-	if(!fullscreen && winspecial==3)
-		xres=301;
 
 	double screen_width = VNSWID_NU(xres);
 	double screen_height = FSettings.TotalScanlines();

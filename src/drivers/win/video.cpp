@@ -228,11 +228,10 @@ void recalculateBestFitRect(int width, int height)
 	if (!lpDD7)
 		return;	// DirectDraw isn't initialized yet
 
+	// Keep display aspect calculations based on the NES logical width.
+	// NTSC 2x still renders to its own wider internal blit buffer, but it
+	// should not force the window/best-fit aspect ratio to 301 pixels wide.
 	int xres = 256;
-	if(fullscreen && vmodes[0].special==3)
-		xres=301;
-	if(!fullscreen && winspecial==3)
-		xres=301;
 
 	double screen_width = VNSWID_NU(xres);
 	double screen_height = FSettings.TotalScanlines();
