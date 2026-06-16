@@ -18,9 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-/* TODO:  Battery backup file saving, mirror force    */
-/* **INCOMPLETE**             */
-/* Override stuff: CHR RAM instead of CHR ROM,   mirroring. */
+ /* TODO:  Battery backup file saving, mirror force    */
+ /* **INCOMPLETE**             */
+ /* Override stuff: CHR RAM instead of CHR ROM,   mirroring. */
 
 #include "types.h"
 #include "fceu.h"
@@ -45,31 +45,31 @@ typedef struct {
 } UNIF_HEADER;
 
 typedef struct {
-	const char *name;
-	void (*init)(CartInfo *);
+	const char* name;
+	void (*init)(CartInfo*);
 	int flags;
 } BMAPPING;
 
 typedef struct {
-	const char *name;
-	int (*init)(FCEUFILE *fp);
+	const char* name;
+	int (*init)(FCEUFILE* fp);
 } BFMAPPING;
 
 static CartInfo UNIFCart;
 
 static int vramo;
 static int mirrortodo;
-static uint8 *boardname;
-static uint8 *sboardname;
+static uint8* boardname;
+static uint8* sboardname;
 
 static uint32 CHRRAMSize;
-uint8 *UNIFchrrama = 0;
+uint8* UNIFchrrama = 0;
 
 static UNIF_HEADER unhead;
 static UNIF_HEADER uchead;
 
 
-static uint8 *malloced[32];
+static uint8* malloced[32];
 static uint32 mallocedsizes[32];
 
 /* used to preserve the rom order as found in the rom file
@@ -90,6 +90,18 @@ static int FixRomSize(uint32 size, uint32 minimum) {
 	while (x < size)
 		x <<= 1;
 	return x;
+}
+
+static int UNIFChunkIndex(void) {
+	char c = uchead.ID[3];
+
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	return -1;
 }
 
 static void FreeUNIF(void) {
@@ -115,15 +127,19 @@ static void FreeUNIF(void) {
 
 static void ResetUNIF(void) {
 	int x;
-	for (x = 0; x < 32; x++)
+	for (x = 0; x < 32; x++) {
 		malloced[x] = 0;
+		mallocedsizes[x] = 0;
+	}
 	for (x = 0; x < 16; x++)
 		prg_idx[x] = chr_idx[x] = 0;
 	vramo = 0;
 	boardname = 0;
+	sboardname = 0;
 	mirrortodo = 0;
 	UNIFCart.clear();
 	UNIFchrrama = 0;
+	CHRRAMSize = 0;
 	prg_chip_count = 0;
 	chr_chip_count = 0;
 	UNIF_PRGROMSize = 0;
@@ -141,11 +157,12 @@ static void MooMirroring(void) {
 		FCEU_MemoryRand(exntar, sizeof(exntar), true);
 		SetupCartMirroring(4, 1, exntar);
 		AddExState(exntar, 2048, 0, "EXNR");
-	} else
+	}
+	else
 		SetupCartMirroring(0, 0, 0);
 }
 
-static int DoMirroring(FCEUFILE *fp) {
+static int DoMirroring(FCEUFILE* fp) {
 	int t;
 	uint32 i;
 	if (uchead.info == 1) {
@@ -153,11 +170,12 @@ static int DoMirroring(FCEUFILE *fp) {
 			return(0);
 		mirrortodo = t;
 		{
-			static const char *stuffo[6] = { "Horizontal", "Vertical", "$2000", "$2400", "\"Four-screen\"", "Controlled by Mapper Hardware" };
+			static const char* stuffo[6] = { "Horizontal", "Vertical", "$2000", "$2400", "\"Four-screen\"", "Controlled by Mapper Hardware" };
 			if (t < 6)
 				FCEU_printf(" Name/Attribute Table Mirroring: %s\n", stuffo[t]);
 		}
-	} else {
+	}
+	else {
 		FCEU_printf(" Incorrect Mirroring Chunk Size (%d). Data is:", uchead.info);
 		for (i = 0; i < uchead.info; i++) {
 			if ((t = FCEU_fgetc(fp)) == EOF)
@@ -170,7 +188,7 @@ static int DoMirroring(FCEUFILE *fp) {
 	return(1);
 }
 
-static int NAME(FCEUFILE *fp) {
+static int NAME(FCEUFILE* fp) {
 	char namebuf[100];
 	int index;
 	int t;
@@ -195,7 +213,7 @@ static void Cleanup(void) {
 	FreeUNIF();
 	ResetUNIF();
 }
-static int DINF(FCEUFILE *fp) {
+static int DINF(FCEUFILE* fp) {
 	char name[100], method[100];
 	uint8 d, m;
 	uint16 y;
@@ -217,7 +235,7 @@ static int DINF(FCEUFILE *fp) {
 	FCEU_printf(" Dumped by: %s\n", name);
 	FCEU_printf(" Dumped with: %s\n", method);
 	{
-		const char *months[12] = {
+		const char* months[12] = {
 			"January", "February", "March", "April", "May", "June", "July",
 			"August", "September", "October", "November", "December"
 		};
@@ -226,7 +244,7 @@ static int DINF(FCEUFILE *fp) {
 	return(1);
 }
 
-static int CTRL(FCEUFILE *fp) {
+static int CTRL(FCEUFILE* fp) {
 	int t;
 	uint32 i;
 	if (uchead.info == 1) {
@@ -242,7 +260,8 @@ static int CTRL(FCEUFILE *fp) {
 			GameInfo->input[0] = GameInfo->input[1] = SI_NONE;
 		if (t & 2)
 			GameInfo->input[1] = SI_ZAPPER;
-	} else {
+	}
+	else {
 		FCEU_printf(" Incorrect Control Chunk Size (%d). Data is:", uchead.info);
 		for (i = 0; i < uchead.info; i++) {
 			t = FCEU_fgetc(fp);
@@ -254,16 +273,17 @@ static int CTRL(FCEUFILE *fp) {
 	return(1);
 }
 
-static int TVCI(FCEUFILE *fp) {
+static int TVCI(FCEUFILE* fp) {
 	int t;
 	if ((t = FCEU_fgetc(fp)) == EOF)
 		return(0);
 	if (t <= 2) {
-		const char *stuffo[3] = { "NTSC", "PAL", "NTSC and PAL" };
+		const char* stuffo[3] = { "NTSC", "PAL", "NTSC and PAL" };
 		if (t == 0) {
 			GameInfo->vidsys = GIV_NTSC;
 			FCEUI_SetVidSystem(0);
-		} else if (t == 1) {
+		}
+		else if (t == 1) {
 			GameInfo->vidsys = GIV_PAL;
 			FCEUI_SetVidSystem(1);
 		}
@@ -272,7 +292,7 @@ static int TVCI(FCEUFILE *fp) {
 	return(1);
 }
 
-static int EnableBattery(FCEUFILE *fp) {
+static int EnableBattery(FCEUFILE* fp) {
 	FCEU_printf(" Battery-backed.\n");
 	if (FCEU_fgetc(fp) == EOF)
 		return(0);
@@ -280,36 +300,39 @@ static int EnableBattery(FCEUFILE *fp) {
 	return(1);
 }
 
-static int LoadPRG(FCEUFILE *fp) {
-	int z, t;
-	z = uchead.ID[3] - '0';
+static int LoadPRG(FCEUFILE* fp) {
+	int z;
+
+	z = UNIFChunkIndex();
 
 	if (z < 0 || z > 15)
 		return(0);
-	FCEU_printf(" PRG ROM %d size: %d KiB", z, ((int)uchead.info)/1024);
-	if (malloced[z])
-		free(malloced[z]);
-	t = FixRomSize(uchead.info, 2048);
-	if (!(malloced[z] = (uint8*)FCEU_malloc(t)))
+	if (prg_chip_count >= 16)
 		return(0);
-	mallocedsizes[z] = t;
-	memset(malloced[z] + uchead.info, 0xFF, t - uchead.info);
+	if (malloced[z]) {
+		FCEU_printf(" Duplicate PRG ROM %X chunk.\n", z);
+		return(0);
+	}
+
+	FCEU_printf(" PRG ROM %X size: %d KiB", z, ((int)uchead.info) / 1024);
+	if (!(malloced[z] = (uint8*)FCEU_malloc(uchead.info)))
+		return(0);
+	mallocedsizes[z] = uchead.info;
+
 	if (FCEU_fread(malloced[z], 1, uchead.info, fp) != uchead.info) {
 		FCEU_printf("Read Error!\n");
 		return(0);
-	} else
+	}
+	else
 		FCEU_printf("\n");
 
-	SetupCartPRGMapping(z, malloced[z], t, 0);
-
-	UNIF_PRGROMSize += t;
+	UNIF_PRGROMSize += uchead.info;
 	prg_idx[prg_chip_count] = z;
 	prg_chip_count++;
-	ROM_size = (t/1024/8);
 	return(1);
 }
 
-static int SetBoardName(FCEUFILE *fp) {
+static int SetBoardName(FCEUFILE* fp) {
 	if (!(boardname = (uint8*)FCEU_malloc(uchead.info + 1)))
 		return(0);
 	FCEU_fread(boardname, 1, uchead.info, fp);
@@ -321,31 +344,35 @@ static int SetBoardName(FCEUFILE *fp) {
 	return(1);
 }
 
-static int LoadCHR(FCEUFILE *fp) {
-	int z, t;
-	z = uchead.ID[3] - '0';
+static int LoadCHR(FCEUFILE* fp) {
+	int z;
+
+	z = UNIFChunkIndex();
+
 	if (z < 0 || z > 15)
 		return(0);
-	FCEU_printf(" CHR ROM %d size: %d", z, (int)uchead.info);
-	if (malloced[16 + z])
-		free(malloced[16 + z]);
-	t = FixRomSize(uchead.info, 8192);
-	if (!(malloced[16 + z] = (uint8*)FCEU_malloc(t)))
+	if (chr_chip_count >= 16)
 		return(0);
-	mallocedsizes[16 + z] = t;
-	memset(malloced[16 + z] + uchead.info, 0xFF, t - uchead.info);
+	if (malloced[16 + z]) {
+		FCEU_printf(" Duplicate CHR ROM %X chunk.\n", z);
+		return(0);
+	}
+
+	FCEU_printf(" CHR ROM %X size: %d", z, (int)uchead.info);
+	if (!(malloced[16 + z] = (uint8*)FCEU_malloc(uchead.info)))
+		return(0);
+	mallocedsizes[16 + z] = uchead.info;
+
 	if (FCEU_fread(malloced[16 + z], 1, uchead.info, fp) != uchead.info) {
 		FCEU_printf("Read Error!\n");
 		return(0);
-	} else
+	}
+	else
 		FCEU_printf("\n");
 
-	SetupCartCHRMapping(z, malloced[16 + z], t, 0);
-
-	UNIF_CHRROMSize += t;
+	UNIF_CHRROMSize += uchead.info;
 	chr_idx[chr_chip_count] = z;
 	chr_chip_count++;
-	VROM_size = (t / 1024 / 8);
 	return(1);
 }
 
@@ -606,7 +633,7 @@ static BFMAPPING bfunc[] = {
 	{ NULL, NULL }
 };
 
-int LoadUNIFChunks(FCEUFILE *fp) {
+int LoadUNIFChunks(FCEUFILE* fp) {
 	int x;
 	int t;
 	for (;; ) {
@@ -635,6 +662,67 @@ int LoadUNIFChunks(FCEUFILE *fp) {
 	}
 }
 
+static int CombineUNIFROMs(void) {
+	uint64 prg_write = 0;
+	uint64 chr_write = 0;
+	uint64 prg_size = 0;
+	uint64 chr_size = 0;
+	int x;
+
+	if (!UNIF_PRGROMSize)
+		return 0;
+
+	prg_size = FixRomSize((uint32)UNIF_PRGROMSize, 2048);
+	if (!(ROM = (uint8*)FCEU_malloc((uint32)prg_size)))
+		return 0;
+	memset(ROM, 0xFF, (uint32)prg_size);
+
+	for (x = 0; x < (int)prg_chip_count; x++) {
+		int p = prg_idx[x];
+
+		if (malloced[p]) {
+			memcpy(ROM + prg_write, malloced[p], mallocedsizes[p]);
+			prg_write += mallocedsizes[p];
+			free(malloced[p]);
+			malloced[p] = 0;
+			mallocedsizes[p] = 0;
+		}
+	}
+
+	UNIF_PRGROMSize = prg_size;
+	ROM_size = (uint32)(UNIF_PRGROMSize / 8192);
+	SetupCartPRGMapping(0, ROM, (uint32)UNIF_PRGROMSize, 0);
+
+	if (UNIF_CHRROMSize) {
+		chr_size = FixRomSize((uint32)UNIF_CHRROMSize, 8192);
+		if (!(VROM = (uint8*)FCEU_malloc((uint32)chr_size)))
+			return 0;
+		memset(VROM, 0xFF, (uint32)chr_size);
+
+		for (x = 0; x < (int)chr_chip_count; x++) {
+			int c = 16 + chr_idx[x];
+
+			if (malloced[c]) {
+				memcpy(VROM + chr_write, malloced[c], mallocedsizes[c]);
+				chr_write += mallocedsizes[c];
+				free(malloced[c]);
+				malloced[c] = 0;
+				mallocedsizes[c] = 0;
+			}
+		}
+
+		UNIF_CHRROMSize = chr_size;
+		VROM_size = (uint32)(UNIF_CHRROMSize / 8192);
+		SetupCartCHRMapping(0, VROM, (uint32)UNIF_CHRROMSize, 0);
+	}
+	else {
+		VROM = 0;
+		VROM_size = 0;
+	}
+
+	return 1;
+}
+
 static int InitializeBoard(void) {
 	int x = 0;
 
@@ -642,7 +730,7 @@ static int InitializeBoard(void) {
 
 	while (bmap[x].name) {
 		if (!strcmp((char*)sboardname, (char*)bmap[x].name)) {
-			if (!malloced[16]) {
+			if (!VROM) {
 				if (bmap[x].flags & BMCFLAG_16KCHRR)
 					CHRRAMSize = 16;
 				else if (bmap[x].flags & BMCFLAG_32KCHRR)
@@ -657,7 +745,8 @@ static int InitializeBoard(void) {
 				if ((UNIFchrrama = (uint8*)FCEU_malloc(CHRRAMSize))) {
 					SetupCartCHRMapping(0, UNIFchrrama, CHRRAMSize, 1);
 					AddExState(UNIFchrrama, CHRRAMSize, 0, "CHRR");
-				} else
+				}
+				else
 					return 2;
 			}
 			if (bmap[x].flags & BMCFLAG_FORCE4)
@@ -684,7 +773,7 @@ static void UNIFGI(GI h) {
 	case GI_POWER:
 		if (UNIFCart.Power)
 			UNIFCart.Power();
-		if (UNIFchrrama) memset(UNIFchrrama, 0, 8192);
+		if (UNIFchrrama) memset(UNIFchrrama, 0, CHRRAMSize);
 		break;
 	case GI_CLOSE:
 		FCEU_SaveGameSave(&UNIFCart);
@@ -695,10 +784,8 @@ static void UNIFGI(GI h) {
 	}
 }
 
-int UNIFLoad(const char *name, FCEUFILE *fp) {
+int UNIFLoad(const char* name, FCEUFILE* fp) {
 
-	int x = 0;
-	uint64 prg_size_bytes = 0, chr_size_bytes = 0;
 	FCEU_fseek(fp, 0, SEEK_SET);
 	FCEU_fread(&unhead, 1, 4, fp);
 	if (memcmp(&unhead, "UNIF", 4))
@@ -731,43 +818,34 @@ int UNIFLoad(const char *name, FCEUFILE *fp) {
 	FCEU_printf("\n");
 	memcpy(&GameInfo->MD5, &UNIFCart.MD5, sizeof(UNIFCart.MD5));
 
+	/* Combine PRG/CHR chunks into normal slot-0 ROM/VROM before board init.
+	 * Most board init code expects one contiguous ROM mapping, not PRG0/PRG1/...
+	 * registered as independent cart mappings.
+	 */
+	if (!CombineUNIFROMs())
+	{
+		FreeUNIF();
+		ResetUNIF();
+		FCEU_PrintError("Error combining UNIF PRG/CHR ROM chunks.");
+		return LOADER_HANDLED_ERROR;
+	}
+
 	int result = InitializeBoard();
 	switch (result)
 	{
 	case 0:
-		goto init_ok;
+		break;
 	case 1:
 		FCEU_PrintError("UNIF mapper \"%s\" is not supported at all.", sboardname);
-		break;
+		FreeUNIF();
+		ResetUNIF();
+		return LOADER_HANDLED_ERROR;
 	case 2:
 		FCEU_PrintError("Unable to allocate CHR-RAM.");
-		break;
+		FreeUNIF();
+		ResetUNIF();
+		return LOADER_HANDLED_ERROR;
 	}
-
-	/* combine multiple prg/chr blocks into single blocks and free memory used. */
-
-	for (x = 0; x < 16; x++) {
-		int p = prg_idx[x];
-		int c = 16 + chr_idx[x];
-		if (malloced[p]) {
-			memcpy(ROM + prg_size_bytes, malloced[p], mallocedsizes[p]);
-			prg_size_bytes += mallocedsizes[p];
-			free(malloced[p]);
-			malloced[p] = 0;
-		}
-
-		if (malloced[c]) {
-			memcpy(VROM + chr_size_bytes, malloced[c], mallocedsizes[c]);
-			chr_size_bytes += mallocedsizes[c];
-			free(malloced[c]);
-			malloced[c] = 0;
-		}
-	}
-	FreeUNIF();
-	ResetUNIF();
-	return LOADER_HANDLED_ERROR;
-
-init_ok:
 
 	FCEU_LoadGameSave(&UNIFCart);
 	strcpy(LoadedRomFName, name); //For the debugger list
@@ -775,3 +853,4 @@ init_ok:
 	currCartInfo = &UNIFCart;
 	return LOADER_OK;
 }
+
