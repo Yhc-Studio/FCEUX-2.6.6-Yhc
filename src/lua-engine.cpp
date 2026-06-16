@@ -6019,7 +6019,8 @@ static int emu_exec_time(lua_State* L)
 	goEvent = CreateEvent(0, true, false, 0);
 	DWORD threadid;
 	HANDLE thread = CreateThread(0, 0, emu_exec_time_proc, (LPVOID)L, 0, &threadid);
-	SetThreadAffinityMask(thread, 1);
+	// Let modern Windows choose the best processor for this Lua helper thread.
+	//SetThreadAffinityMask(thread, 1);
 	//wait for the lua thread to start
 	WaitForSingleObject(readyEvent, INFINITE);
 	ResetEvent(readyEvent);
