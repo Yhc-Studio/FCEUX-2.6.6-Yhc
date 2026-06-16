@@ -3112,7 +3112,7 @@ static void NSFDrawInfoPanel(uint8* XBuf)
 
 	NSFDrawText(XBuf, 8, 8, "FCEUX NSF Player", kFgColor);
 
-	snprintf(line, sizeof(line), "Title : %.28s", NSFHeader.SongName[0] ? (char*)NSFHeader.SongName : "(unknown)");
+	snprintf(line, sizeof(line), "Title: %.28s", NSFHeader.SongName[0] ? (char*)NSFHeader.SongName : "(unknown)");
 	NSFDrawText(XBuf, 8, 24, line, kFgColor);
 
 	snprintf(line, sizeof(line), "Artist: %.28s", NSFHeader.Artist[0] ? (char*)NSFHeader.Artist : "(unknown)");
@@ -3123,17 +3123,17 @@ static void NSFDrawInfoPanel(uint8* XBuf)
 
 	if (NSFIsNSFe && NSFGetCurrentTrackLabel()[0])
 	{
-		snprintf(line, sizeof(line), "Label : %.24s", NSFGetCurrentTrackLabel());
+		snprintf(line, sizeof(line), "Label: %.24s", NSFGetCurrentTrackLabel());
 		NSFDrawText(XBuf, 8, 60, line, kFgColor);
 	}
 
-	snprintf(line, sizeof(line), "Track : %02d/%02d", CurrentSong, NSFHeader.TotalSongs);
+	snprintf(line, sizeof(line), "Track: %02d/%02d", CurrentSong, NSFHeader.TotalSongs);
 	NSFDrawText(XBuf, 8, 72, line, kFgColor);
 
-	snprintf(line, sizeof(line), "State : %s", NSFGetPlaybackStateName());
+	snprintf(line, sizeof(line), "State: %s", NSFGetPlaybackStateName());
 	NSFDrawText(XBuf, 96, 72, line, kFgColor);
 
-	snprintf(line, sizeof(line), "Start : %02d", NSFHeader.StartingSong);
+	snprintf(line, sizeof(line), "Start: %02d", NSFHeader.StartingSong);
 	NSFDrawText(XBuf, 8, 84, line, kFgColor);
 
 	{
@@ -3144,10 +3144,10 @@ static void NSFDrawInfoPanel(uint8* XBuf)
 		if (NSFIsNSFe && totalMs >= 0)
 		{
 			NSFFormatMS(totalbuf, sizeof(totalbuf), totalMs);
-			snprintf(line, sizeof(line), "Time  : %s/%s", timebuf, totalbuf);
+			snprintf(line, sizeof(line), "Time: %s/%s", timebuf, totalbuf);
 		}
 		else
-			snprintf(line, sizeof(line), "Time  : %s", timebuf);
+			snprintf(line, sizeof(line), "Time: %s", timebuf);
 		NSFDrawText(XBuf, 96, 84, line, kFgColor);
 	}
 
@@ -3319,7 +3319,7 @@ void DrawNSF(uint8* XBuf)
 	NSFDrawInfoPanel(XBuf);
 	NSFDrawChannelLevelPanel(XBuf, 166, 8);
 	NSFDrawWaveView(XBuf, 16, 104, 224, 50);
-	NSFDrawKeyboardView(XBuf, 16, 178, 224, 50);
+	NSFDrawKeyboardView(XBuf, 16, 172, 224, 50);
 
 	{
 		static uint8 last = 0;
