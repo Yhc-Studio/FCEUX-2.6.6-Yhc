@@ -1381,6 +1381,7 @@ static void Fixit1(void) {
 }
 
 void MMC5_hb(int);		//Ugh ugh ugh.
+void Mapper800_HBlank(int scanline);
 static void DoLine(void) {
 	if (scanline >= 240 && scanline != totalscanlines) {
 		X6502_Run(256 + 69);
@@ -1394,6 +1395,7 @@ static void DoLine(void) {
 	u8* dtarget = XDBuf + ((scanline < 240 ? scanline : 240) << 8);
 
 	if (MMC5Hack) MMC5_hb(scanline);
+	if (Mapper800Hack) Mapper800_HBlank(scanline);
 
 	X6502_Run(256);
 	EndRL();

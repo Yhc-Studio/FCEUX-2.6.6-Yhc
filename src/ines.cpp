@@ -1153,7 +1153,7 @@ BMAPPINGLocal bmap[] = {
 	{ "BS-N032", 763, Mapper763_Init },
 	{ "43-236/841134C", 764, Mapper764_Init },
 	{ "820315-C", 765, Mapper765_Init },
-	{ "FlameCyclone_Mapper", 800, Mapper800_Init },
+	{ "FlameCyclone Mapper", 800, Mapper800_Init },
 	{"",					0, NULL}
 };
 int iNESLoad(const char* name, FCEUFILE* fp, int OverwriteVidMode) {

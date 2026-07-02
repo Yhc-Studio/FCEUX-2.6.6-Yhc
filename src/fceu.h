@@ -50,6 +50,8 @@ const char *FCEUI_GetAboutString(void);
 
 extern uint64 timestampbase;
 
+extern int Mapper800Hack;
+
 // MMC5 external shared buffers/vars
 extern int MMC5Hack;
 extern uint32 MMC5HackVROMMask;
