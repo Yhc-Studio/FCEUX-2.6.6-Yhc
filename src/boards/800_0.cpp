@@ -45,6 +45,16 @@ namespace Mapper_800_0
 			uint16_t data;
 		}dma_src, dma_dst, dma_size;
 
+		struct {
+			union _multi {
+				struct {
+					uint16_t low : 8;
+					uint16_t high : 8;
+				};
+				uint16_t data;
+			}offset, mask;
+		}multi_prg, multi_chr;
+
 		int16_t irq_count;
 		int16_t irq_acount;
 		uint8_t irq_latch;
@@ -66,13 +76,13 @@ namespace Mapper_800_0
 
 	}reg;
 
-	uint32_t WRAM_8K_COUNT = 256;
+	uint32_t WRAM_8K_COUNT = 1024;
 	uint32_t WRAM_8K_MASK = WRAM_8K_COUNT - 1;
 	uint32_t WRAM_SIZE = 0x2000 * WRAM_8K_COUNT;
 	uint32_t WRAM_PAGE_INDEX = 0x10;
 	uint8_t* WRAM = nullptr;
 
-	uint32_t CHR_RAM_1K_COUNT = 512;
+	uint32_t CHR_RAM_1K_COUNT = 1024;
 	uint32_t CHR_RAM_1K_MASK = CHR_RAM_1K_COUNT - 1;
 	uint32_t CHR_RAM_SIZE = 0x1024 * CHR_RAM_1K_COUNT;
 	uint32_t CHR_RAM_PAGE_INDEX = 0x10;
@@ -81,42 +91,42 @@ namespace Mapper_800_0
 	uint8_t* ExRAM_5000 = nullptr;
 	uint32_t ExRAM_5000_BANK_SIZE = 0x1000;
 	uint32_t ExRAM_5000_BANK_SIZE_MASK = ExRAM_5000_BANK_SIZE - 1;
-	uint32_t ExRAM_5000_BANK_COUNT = 256;
+	uint32_t ExRAM_5000_BANK_COUNT = 1024;
 	uint32_t ExRAM_5000_BANK_MASK = ExRAM_5000_BANK_COUNT - 1;
 	uint32_t ExRAM_5000_DATA_SIZE = ExRAM_5000_BANK_SIZE * ExRAM_5000_BANK_COUNT;
 
 	uint8_t* ExRAM_4800 = nullptr;
 	uint32_t ExRAM_4800_BANK_SIZE = 0x0800;
 	uint32_t ExRAM_4800_BANK_SIZE_MASK = ExRAM_4800_BANK_SIZE - 1;
-	uint32_t ExRAM_4800_BANK_COUNT = 256;
+	uint32_t ExRAM_4800_BANK_COUNT = 1024;
 	uint32_t ExRAM_4800_BANK_MASK = ExRAM_4800_BANK_COUNT - 1;
 	uint32_t ExRAM_4800_DATA_SIZE = ExRAM_4800_BANK_SIZE * ExRAM_4800_BANK_COUNT;
 
 	uint8_t* ExRAM_4400 = nullptr;
 	uint32_t ExRAM_4400_BANK_SIZE = 0x0400;
 	uint32_t ExRAM_4400_BANK_SIZE_MASK = ExRAM_4400_BANK_SIZE - 1;
-	uint32_t ExRAM_4400_BANK_COUNT = 256;
+	uint32_t ExRAM_4400_BANK_COUNT = 1024;
 	uint32_t ExRAM_4400_BANK_MASK = ExRAM_4400_BANK_COUNT - 1;
 	uint32_t ExRAM_4400_DATA_SIZE = ExRAM_4400_BANK_SIZE * ExRAM_4400_BANK_COUNT;
 
 	uint8_t* ExRAM_4200 = nullptr;
 	uint32_t ExRAM_4200_BANK_SIZE = 0x0200;
 	uint32_t ExRAM_4200_BANK_SIZE_MASK = ExRAM_4200_BANK_SIZE - 1;
-	uint32_t ExRAM_4200_BANK_COUNT = 256;
+	uint32_t ExRAM_4200_BANK_COUNT = 1024;
 	uint32_t ExRAM_4200_BANK_MASK = ExRAM_4200_BANK_COUNT - 1;
 	uint32_t ExRAM_4200_DATA_SIZE = ExRAM_4200_BANK_SIZE * ExRAM_4200_BANK_COUNT;
 
 	uint8_t* ExRAM_4100 = nullptr;
 	uint32_t ExRAM_4100_BANK_SIZE = 0x0100;
 	uint32_t ExRAM_4100_BANK_SIZE_MASK = ExRAM_4100_BANK_SIZE - 1;
-	uint32_t ExRAM_4100_BANK_COUNT = 256;
+	uint32_t ExRAM_4100_BANK_COUNT = 1024;
 	uint32_t ExRAM_4100_BANK_MASK = ExRAM_4100_BANK_COUNT - 1;
 	uint32_t ExRAM_4100_DATA_SIZE = ExRAM_4100_BANK_SIZE * ExRAM_4100_BANK_COUNT;
 
 	uint8_t* ExRAM_4080 = nullptr;
 	uint32_t ExRAM_4080_BANK_SIZE = 0x0080;
 	uint32_t ExRAM_4080_BANK_SIZE_MASK = ExRAM_4080_BANK_SIZE - 1;
-	uint32_t ExRAM_4080_BANK_COUNT = 256;
+	uint32_t ExRAM_4080_BANK_COUNT = 1024;
 	uint32_t ExRAM_4080_BANK_MASK = ExRAM_4080_BANK_COUNT - 1;
 	uint32_t ExRAM_4080_DATA_SIZE = ExRAM_4080_BANK_SIZE * ExRAM_4080_BANK_COUNT;
 
@@ -128,6 +138,9 @@ namespace Mapper_800_0
 
 	SFORMAT StateRegs[] =
 	{
+		{ &reg.multi_prg, sizeof(reg.multi_prg),					"MPRG" },
+		{ &reg.multi_chr, sizeof(reg.multi_chr),					"MCHR" },
+
 		{ reg.prg8k, sizeof(reg.prg8k),								"PRG8" },
 		{ reg.prg16k, sizeof(reg.prg16k),							"PRG16" },
 		{ reg.chr1k, sizeof(reg.chr1k),								"CHR1" },
@@ -263,13 +276,16 @@ namespace Mapper_800_0
 			const uint32_t bank = reg.prg8k[i].data % prg_8k_count;
 			const uint32_t ram = reg.prg8k[i].ram;
 			const uint32_t addr = 0x6000 + i * 0x2000;
+
+			const uint32_t reg_prg_8K_offset = reg.multi_prg.offset.data;
+			const uint32_t reg_prg_8K_mask = reg.multi_prg.mask.data;
 			if (reg.prg8k[i].ram)
 			{
 				setprg8r(WRAM_PAGE_INDEX, addr, bank & WRAM_8K_MASK);
 			}
 			else
 			{
-				setprg8(addr, bank);
+				setprg8(addr, reg_prg_8K_offset + (bank & reg_prg_8K_mask));
 			}
 		}
 
@@ -352,13 +368,17 @@ namespace Mapper_800_0
 			{
 				const uint32_t bank = reg.chr1k[i].data;
 				const uint32_t addr = i * 0x0400;
+
+				const uint32_t reg_chr_1K_offset = reg.multi_chr.offset.data;
+				const uint32_t reg_chr_1K_mask = reg.multi_chr.mask.data;
+
 				if (reg.chr1k[i].ram)
 				{
 					setchr1r(CHR_RAM_PAGE_INDEX, addr, bank & CHR_RAM_1K_MASK);
 				}
 				else
 				{
-					setchr1(addr, bank % chr_1k_count);
+					setchr1(addr, reg_chr_1K_offset + (bank & reg_chr_1K_mask));
 				}
 			}
 		}
@@ -371,8 +391,6 @@ namespace Mapper_800_0
 				setchr1r(CHR_RAM_PAGE_INDEX, addr, bank & CHR_RAM_1K_MASK);
 			}
 		}
-
-
 	}
 
 	void DMA_Sync(int mode, uint32_t src, uint32_t dst, uint32_t size)
@@ -784,6 +802,31 @@ namespace Mapper_800_0
 
 		case reg_bcd_out_10000:
 			return reg.bcd_out[4];
+			break;
+
+		case reg_prg_8K_offset_l:
+			return reg.multi_prg.offset.low;
+			break;
+		case reg_prg_8K_offset_h:
+			return reg.multi_prg.offset.high;
+			break;
+		case reg_prg_8K_mask_l:
+			return reg.multi_prg.mask.low;
+			break;
+		case reg_prg_8K_mask_h:
+			return reg.multi_prg.mask.high;
+			break;
+		case reg_chr_1K_offset_l:
+			return reg.multi_chr.offset.low;
+			break;
+		case reg_chr_1K_offset_h:
+			return reg.multi_chr.offset.high;
+			break;
+		case reg_chr_1K_mask_l:
+			return reg.multi_chr.mask.low;
+			break;
+		case reg_chr_1K_mask_h:
+			return reg.multi_chr.mask.high;
 			break;
 
 		default:
@@ -1262,6 +1305,38 @@ namespace Mapper_800_0
 			Bcd_Sync();
 			break;
 
+		case reg_prg_8K_offset_l:
+			reg.multi_prg.offset.low = V;
+			Sync();
+			break;
+		case reg_prg_8K_offset_h:
+			reg.multi_prg.offset.high = V;
+			Sync();
+			break;
+		case reg_prg_8K_mask_l:
+			reg.multi_prg.mask.low = V;
+			Sync();
+			break;
+		case reg_prg_8K_mask_h:
+			reg.multi_prg.mask.high = V;
+			Sync();
+			break;
+		case reg_chr_1K_offset_l:
+			reg.multi_chr.offset.low = V;
+			Sync();
+			break;
+		case reg_chr_1K_offset_h:
+			reg.multi_chr.offset.high = V;
+			Sync();
+			break;
+		case reg_chr_1K_mask_l:
+			reg.multi_chr.mask.low = V;
+			Sync();
+			break;
+		case reg_chr_1K_mask_h:
+			reg.multi_chr.mask.high = V;
+			Sync();
+			break;
 		default:
 			break;
 		}
@@ -1269,11 +1344,16 @@ namespace Mapper_800_0
 
 	uint8 ExRAM_5000_Read(uint32 A) noexcept
 	{
+		//uint32 tmp = A & 0x1FFF;
+		//return VPage[tmp >> 10][tmp];
+
 		return ExRAM_5000[A & ExRAM_5000_BANK_SIZE_MASK + reg.exram_5000 * ExRAM_5000_BANK_SIZE];
 	}
 
 	void ExRAM_5000_Write(uint32 A, uint8 V) noexcept
 	{
+		//uint32 tmp = A & 0x1FFF;
+		//VPage[tmp >> 10][tmp] = V;
 		ExRAM_5000[A & ExRAM_5000_BANK_SIZE_MASK + reg.exram_5000 * ExRAM_5000_BANK_SIZE] = V;
 	}
 
@@ -1491,6 +1571,12 @@ namespace Mapper_800_0
 		reg.prg8k[0].ram = 1;
 		reg.prg8k[0].reserved = 1;
 
+		reg.multi_prg.offset.data = 0;
+		reg.multi_prg.mask.data = 0xFFFF;
+
+		reg.multi_chr.offset.data = 0;
+		reg.multi_chr.mask.data = 0xFFFF;
+
 		for (int i = 0; i < 8; i++)
 		{
 			SetCHRReg(i, i);
@@ -1506,12 +1592,12 @@ namespace Mapper_800_0
 		prg_4k_count = ROM_size << 2;
 		chr_1k_count = VROM_size << 3;
 
-		/*if (CHR_RAM)
+		if (CHR_RAM)
 		{
 			const int32_t chr_bytes_size = 1024 * chr_1k_count;
 			const int32_t copy_bytes_size = (chr_bytes_size < CHR_RAM_SIZE) ? chr_bytes_size : CHR_RAM_SIZE;
 			memcpy_s(CHRptr[CHR_RAM_PAGE_INDEX], CHR_RAM_SIZE, CHRptr[0], copy_bytes_size);
-		}*/
+		}
 
 		MapperReset();
 
