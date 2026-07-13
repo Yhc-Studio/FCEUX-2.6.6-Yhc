@@ -84,7 +84,7 @@ namespace Mapper_800_0
 
 	uint32_t CHR_RAM_1K_COUNT = 1024;
 	uint32_t CHR_RAM_1K_MASK = CHR_RAM_1K_COUNT - 1;
-	uint32_t CHR_RAM_SIZE = 0x1024 * CHR_RAM_1K_COUNT;
+	uint32_t CHR_RAM_SIZE = 1024 * CHR_RAM_1K_COUNT;
 	uint32_t CHR_RAM_PAGE_INDEX = 0x10;
 	uint8_t* CHR_RAM = nullptr;
 
@@ -386,10 +386,14 @@ namespace Mapper_800_0
 		{
 			for (int i = 0; i < reg_chr_count; i++)
 			{
-				const uint32_t bank = reg.chr1k[i].data / CHR_RAM_1K_MASK;
+				const uint32_t bank = reg.chr1k[i].data;
 				const uint32_t addr = i * 0x0400;
 				setchr1r(CHR_RAM_PAGE_INDEX, addr, bank & CHR_RAM_1K_MASK);
 			}
+
+			/*const uint32_t bank = reg.chr1k[i].data / CHR_RAM_1K_MASK;
+			const uint32_t addr = i * 0x0400;
+			setchr1r(CHR_RAM_PAGE_INDEX, addr, bank & CHR_RAM_1K_MASK);*/
 		}
 	}
 

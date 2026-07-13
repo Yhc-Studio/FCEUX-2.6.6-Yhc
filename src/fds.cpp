@@ -336,80 +336,197 @@ static DECLFR(FDSRead4033) {
 
 /* Begin FDS sound */
 
-/* 2025-09-12 - negativeExponent
-   Ported modulation/sweep logic from Mednafen NES
+/*
+ * Split FDS sound core
+ *
+ * Normal FDS ROM and single-FDS NSF playback use the original FCEUX b19/b24
+ * latch core, which is closer to the standalone FDS reference playback.
+ * Multi-expansion NSF mux/direct playback uses the previous mixed/direct core
+ * as a separate state machine.  Keeping the two cores physically separate is
+ * important: the mux can be committed after NSF initialization has already
+ * performed register writes/renders, and sharing the same count/env/phase state
+ * can make only part of the stream advance with the mixed timing, producing the
+ * remaining pitch drift heard in muxed FDS tracks.
  */
 
 #define FDSClock (1789772.7272727272727272 / 2)
 
+extern int FCEU_NSFIsExpSoundMuxEnabled(void);
+extern int FCEU_NSFGetExpSoundCount(void);
+
+static uint8 FDSNSFDirectMode = 0;
+static uint8 FDSMixedCoreLatched = 0;
+
 typedef struct {
-	int64 cycles;     // Cycles per PCM sample
-	int64 count;    // Cycle counter
-	int64 envcount;    // Envelope cycle counter
-	uint8 amplitude[2];  // Current amplitudes.
+	int64 cycles;
+	int64 count;
+	int64 envcount;
+
+	uint32 b19shiftreg60;
+	uint32 b24adder66;
+	uint32 b24latch68;
+	uint32 b17latch76;
+	int32 clockcount;
+	uint8 b8shiftreg88;
+
+	uint8 amplitude[2];
 	uint8 speedo[2];
 	uint8 mwcount;
 	uint8 mwstart;
-	uint8 tick_div;          // 2 CPU-cycle subtick divider; FDS wave/mod units tick every 16 CPU cycles.
-	uint8 mwave[0x20];      // Modulation waveform, raw 3-bit entries.
-	uint8 cwave[0x40];      // Game-defined waveform(carrier)
+	uint8 mwave[0x20];
+	uint8 cwave[0x40];
+	uint8 SPSG[0xB];
+} FDSNORMALCORE;
+
+typedef struct {
+	int64 cycles;
+	int64 count;
+	int64 envcount;
+	uint8 tick_div;
+
+	uint8 amplitude[2];
+	uint8 speedo[2];
+	uint8 mwcount;
+	uint8 mwstart;
+	uint8 mwave[0x20];
+	uint8 cwave[0x40];
 	uint8 SPSG[0xB];
 
-	uint32 cwave_freq;	/* $4082 and lower 4 bits of $4083 */
+	uint32 cwave_freq;
 	uint32 cwave_pos;
+	uint32 mod_freq;
+	uint32 mod_pos;
+	uint8 mod_disabled;
+	uint32 sweep_bias;
+	int32 mod_out;
+	uint32 sample_cache_out;
+} FDSMIXEDCORE;
 
-	uint32 mod_freq;	/* $4086 and lower 4 bits of $4087 */
-	uint32 mod_pos;		/* Should be named "mwave_pos", but "mod_pos" distinguishes it more. */
-	uint8 mod_disabled;	/* Upper bit of $4087 */
-
-	uint32 sweep_bias;	/* $4085 mod counter, stored as raw signed 7-bit value. */
-
-	int32 mod_out;		/* output from modulator, centered around 0 for debugging/state. */
-	uint32 sample_cache_out; /* Sample out cache, with volume, modulation, and others applied */
-} FDSSOUND;
-
-static FDSSOUND fdso;
+static FDSNORMALCORE fdsn;
+static FDSMIXEDCORE fdsm;
 static const int bias_tab[8] = { 0, 1, 2, 4, 0, -4, -2, -1 };
+static int32 FBCNormal = 0;
+static int32 FBCMixed = 0;
 
-#define  SPSG  fdso.SPSG
-#define amplitude  fdso.amplitude
-#define speedo    fdso.speedo
 
-#define cwave_freq fdso.cwave_freq
-#define cwave_pos fdso.cwave_pos
-
-#define mod_freq fdso.mod_freq
-#define mod_pos fdso.mod_pos
-#define mod_disabled fdso.mod_disabled
-
-#define sweep_bias fdso.sweep_bias
+static INLINE int FDSUseMixedCore(void) {
+	/*
+	 * In NSF direct mode the mux can be committed after FDS has already
+	 * installed its handlers, and in some players the per-chip register writes
+	 * begin while the final mux flag has not yet been observed by FDS.  The
+	 * previous good mixed version used one direct FDS core for the whole stream.
+	 * Latch the mixed path as soon as this is a direct NSF with more than one
+	 * expansion sound registered, not only after GameExpSound has already been
+	 * replaced by the mux wrapper.  Single-FDS NSF/ROM playback still stays on
+	 * the normal original FCEUX core.
+	 */
+	if (FDSNSFDirectMode && (FCEU_NSFIsExpSoundMuxEnabled() || FCEU_NSFGetExpSoundCount() > 1))
+		FDSMixedCoreLatched = 1;
+	return FDSMixedCoreLatched;
+}
 
 void FDSSoundStateAdd(void) {
-	AddExState(fdso.cwave, 64, 0, "WAVE");
-	AddExState(fdso.mwave, 32, 0, "MWAV");
-	AddExState(amplitude, 2, 0, "AMPL");
-	AddExState(SPSG, 0xB, 0, "SPSG");
+	AddExState(fdsn.cwave, 64, 0, "WAVE");
+	AddExState(fdsn.mwave, 32, 0, "MWAV");
+	AddExState(fdsn.amplitude, 2, 0, "AMPL");
+	AddExState(fdsn.SPSG, 0xB, 0, "SPSG");
+	AddExState(&fdsn.b8shiftreg88, 1, 0, "B88");
+	AddExState(&fdsn.clockcount, 4, 1, "CLOC");
+	AddExState(&fdsn.b19shiftreg60, 4, 1, "B60");
+	AddExState(&fdsn.b24adder66, 4, 1, "B66");
+	AddExState(&fdsn.b24latch68, 4, 1, "B68");
+	AddExState(&fdsn.b17latch76, 4, 1, "B76");
 
-	AddExState(&cwave_freq, 4, 1, "CFRQ");
-	AddExState(&cwave_pos, 4, 1, "CPOS");
-
-	AddExState(&mod_freq, 4, 1, "MFRQ");
-	AddExState(&mod_pos, 4, 1, "MPOS");
-	AddExState(&mod_disabled, 1, 1, "MDIS");
-	AddExState(&fdso.tick_div, 1, 1, "FTDV");
-
-	AddExState(&sweep_bias, 4, 1, "BIAS");
-
-	AddExState(&fdso.mod_out, 4, 1, "MOUT");
-	AddExState(&fdso.sample_cache_out, 4, 1, "WOUT");
+	AddExState(fdsm.cwave, 64, 0, "MCWV");
+	AddExState(fdsm.mwave, 32, 0, "MMW2");
+	AddExState(fdsm.amplitude, 2, 0, "MAMP");
+	AddExState(fdsm.SPSG, 0xB, 0, "MSPG");
+	AddExState(&fdsm.cwave_freq, 4, 1, "MCFQ");
+	AddExState(&fdsm.cwave_pos, 4, 1, "MCP2");
+	AddExState(&fdsm.mod_freq, 4, 1, "MMFQ");
+	AddExState(&fdsm.mod_pos, 4, 1, "MMP2");
+	AddExState(&fdsm.mod_disabled, 1, 1, "MDS2");
+	AddExState(&fdsm.tick_div, 1, 1, "MTDV");
+	AddExState(&fdsm.sweep_bias, 4, 1, "MSWB");
+	AddExState(&fdsm.mod_out, 4, 1, "MMOU");
+	AddExState(&fdsm.sample_cache_out, 4, 1, "MWOU");
 }
 
 static DECLFR(FDSSRead) {
+	FDSNORMALCORE* n = &fdsn;
+	FDSMIXEDCORE* m = &fdsm;
+	if (FDSUseMixedCore()) {
+		switch (A & 0xF) {
+		case 0x0: return(m->amplitude[0] | (X.DB & 0xC0));
+		case 0x2: return(m->amplitude[1] | (X.DB & 0xC0));
+		}
+	}
 	switch (A & 0xF) {
-	case 0x0: return(amplitude[0] | (X.DB & 0xC0));
-	case 0x2: return(amplitude[1] | (X.DB & 0xC0));
+	case 0x0: return(n->amplitude[0] | (X.DB & 0xC0));
+	case 0x2: return(n->amplitude[1] | (X.DB & 0xC0));
 	}
 	return(X.DB);
+}
+
+static void DoEnvNormal(void) {
+	static int counto[2] = { 0, 0 };
+	int x;
+
+	for (x = 0; x < 2; x++)
+		if (!(fdsn.SPSG[x << 2] & 0x80) && !(fdsn.SPSG[0x3] & 0x40)) {
+			if (counto[x] <= 0) {
+				if (!(fdsn.SPSG[x << 2] & 0x80)) {
+					if (fdsn.SPSG[x << 2] & 0x40) {
+						if (fdsn.amplitude[x] < 0x3F)
+							fdsn.amplitude[x]++;
+					}
+					else {
+						if (fdsn.amplitude[x] > 0)
+							fdsn.amplitude[x]--;
+					}
+				}
+				counto[x] = (fdsn.SPSG[x << 2] & 0x3F);
+			}
+			else
+				counto[x]--;
+		}
+}
+
+static void DoEnvMixed(void) {
+	static int counto[2] = { 0, 0 };
+	int x;
+
+	for (x = 0; x < 2; x++)
+		if (!(fdsm.SPSG[x << 2] & 0x80) && !(fdsm.SPSG[0x3] & 0x40)) {
+			if (counto[x] <= 0) {
+				if (!(fdsm.SPSG[x << 2] & 0x80)) {
+					if (fdsm.SPSG[x << 2] & 0x40) {
+						if (fdsm.amplitude[x] < 0x3F)
+							fdsm.amplitude[x]++;
+					}
+					else {
+						if (fdsm.amplitude[x] > 0)
+							fdsm.amplitude[x]--;
+					}
+				}
+				counto[x] = (fdsm.SPSG[x << 2] & 0x3F);
+			}
+			else
+				counto[x]--;
+		}
+}
+
+static DECLFR(FDSWaveRead) {
+	if (FDSUseMixedCore())
+		return(fdsm.cwave[A & 0x3f] | (X.DB & 0xC0));
+	return(fdsn.cwave[A & 0x3f] | (X.DB & 0xC0));
+}
+
+static DECLFW(FDSWaveWrite) {
+	if (fdsn.SPSG[0x9] & 0x80)
+		fdsn.cwave[A & 0x3f] = V & 0x3F;
+	if (fdsm.SPSG[0x9] & 0x80)
+		fdsm.cwave[A & 0x3f] = V & 0x3F;
 }
 
 static DECLFW(FDSSWrite) {
@@ -419,131 +536,142 @@ static DECLFW(FDSSWrite) {
 		else
 			RenderSound();
 	}
+
 	A -= 0x4080;
 	switch (A) {
 	case 0x0:
 	case 0x4:
-		if (V & 0x80)
-			amplitude[(A & 0xF) >> 2] = V & 0x3F;
+		if (V & 0x80) {
+			fdsn.amplitude[(A & 0xF) >> 2] = V & 0x3F;
+			fdsm.amplitude[(A & 0xF) >> 2] = V & 0x3F;
+		}
 		break;
+
 	case 0x2:
-		cwave_freq &= 0xFF00;
-		cwave_freq |= V << 0;
+		fdsm.cwave_freq &= 0xFF00;
+		fdsm.cwave_freq |= V << 0;
 		break;
 
 	case 0x3:
-		/* $4083.7 halts the wave unit and immediately resets its accumulator.
-		 * The old code reset the accumulator when the halt bit was cleared, which
-		 * can shift short FDS notes by one phase interval.
-		 */
 		if (V & 0x80)
-			cwave_pos = 0;
-
-		cwave_freq &= 0x00FF;
-		cwave_freq |= (V & 0xF) << 8;
+			fdsm.cwave_pos = 0;
+		fdsm.cwave_freq &= 0x00FF;
+		fdsm.cwave_freq |= (V & 0xF) << 8;
 		break;
 
 	case 0x5:
-		/* $4085 is the signed 7-bit modulation counter itself.  It does not
-		 * reset the modulation table position.
-		 */
-		sweep_bias = V & 0x7F;
+		fdsm.sweep_bias = V & 0x7F;
 		break;
 
 	case 0x6:
-		mod_freq &= 0xFF00;
-		mod_freq |= V << 0;
+		fdsm.mod_freq &= 0xFF00;
+		fdsm.mod_freq |= V << 0;
 		break;
 
 	case 0x7:
-		mod_freq &= 0x00FF;
-		mod_freq |= (V & 0xF) << 8;
-		/* Halting the mod unit resets its low timer accumulator, but not the
-		 * 32-entry table position.  The frequency modulation formula remains
-		 * active through $4084/$4085 even while the table is halted.
-		 */
+		/* Original-core modulation table write pointer reset. */
+		fdsn.b17latch76 = 0;
+		fdsn.SPSG[0x5] = 0;
+
+		/* Previous mixed/direct core behavior. */
+		fdsm.mod_freq &= 0x00FF;
+		fdsm.mod_freq |= (V & 0xF) << 8;
 		if (V & 0x80)
-			mod_pos &= ~0x0FFFU;
-		mod_disabled = (bool)(V & 0x80);
+			fdsm.mod_pos &= ~0x0FFFU;
+		fdsm.mod_disabled = (bool)(V & 0x80);
 		break;
 
 	case 0x8:
-		if (mod_disabled) {
-			/* $4088 writes at the current mod-table position and then advances
-			 * that position.  The table stores raw 3-bit values; they are decoded
-			 * to +0,+1,+2,+4,reset,-4,-2,-1 when the mod unit ticks.
-			 */
-			fdso.mwave[(mod_pos >> 13) & 0x1F] = V & 0x07;
-			mod_pos = (mod_pos + (1U << 13)) & 0x3FFFFU;
+		/* Original FCEUX core table, used by normal FDS ROM and single-FDS NSF. */
+		fdsn.b17latch76 = 0;
+		fdsn.mwave[fdsn.SPSG[0x5] & 0x1F] = V & 0x07;
+		fdsn.SPSG[0x5] = (fdsn.SPSG[0x5] + 1) & 0x1F;
+
+		/* Previous mixed/direct-mode table behavior, kept exact and isolated. */
+		if (fdsm.mod_disabled) {
+			fdsm.mwave[(fdsm.mod_pos >> 13) & 0x1F] = V & 0x07;
+			fdsm.mod_pos = (fdsm.mod_pos + (1U << 13)) & 0x3FFFFU;
 		}
 		break;
 	}
-	SPSG[A] = V;
+	fdsn.SPSG[A] = V;
+	fdsm.SPSG[A] = V;
 }
 
-// $4080 - Fundamental wave amplitude data register 92
-// $4082 - Fundamental wave frequency data register 58
-// $4083 - Same as $4082($4083 is the upper 4 bits).
+/* ---------- Original FCEUX core for normal FDS ROM / single FDS NSF ---------- */
 
-// $4084 - Modulation amplitude data register 78
-// $4086 - Modulation frequency data register 72
-// $4087 - Same as $4086($4087 is the upper 4 bits)
+static int ta;
 
-
-static void DoEnv() {
-	int x;
-
-	for (x = 0; x < 2; x++)
-		if (!(SPSG[x << 2] & 0x80) && !(SPSG[0x3] & 0x40)) {
-			static int counto[2] = { 0, 0 };
-
-			if (counto[x] <= 0) {
-				if (!(SPSG[x << 2] & 0x80)) {
-					if (SPSG[x << 2] & 0x40) {
-						if (amplitude[x] < 0x3F)
-							amplitude[x]++;
-					}
-					else {
-						if (amplitude[x] > 0)
-							amplitude[x]--;
-					}
-				}
-				counto[x] = (SPSG[x << 2] & 0x3F);
+static INLINE void ClockRiseNormal(void) {
+	if (!fdsn.clockcount) {
+		ta++;
+		fdsn.b19shiftreg60 = (fdsn.SPSG[0x2] | ((fdsn.SPSG[0x3] & 0xF) << 8));
+		fdsn.b17latch76 = (fdsn.SPSG[0x6] | ((fdsn.SPSG[0x07] & 0xF) << 8)) + fdsn.b17latch76;
+		if (!(fdsn.SPSG[0x7] & 0x80)) {
+			int t = fdsn.mwave[(fdsn.b17latch76 >> 13) & 0x1F] & 7;
+			int t2 = fdsn.amplitude[1];
+			int adj = 0;
+			if ((t & 3)) {
+				if ((t & 4)) adj -= (t2 * ((4 - (t & 3))));
+				else adj += (t2 * ((t & 3)));
 			}
-			else
-				counto[x]--;
+			adj *= 2;
+			if (adj > 0x7F) adj = 0x7F;
+			if (adj < -0x80) adj = -0x80;
+			fdsn.b8shiftreg88 = 0x80 + adj;
 		}
+		else {
+			fdsn.b8shiftreg88 = 0x80;
+		}
+	}
+	else {
+		fdsn.b19shiftreg60 <<= 1;
+		fdsn.b8shiftreg88 >>= 1;
+	}
+
+	fdsn.b24adder66 = (fdsn.b24latch68 + fdsn.b19shiftreg60) & 0x1FFFFFF;
 }
 
-static DECLFR(FDSWaveRead) {
-	return(fdso.cwave[A & 0x3f] | (X.DB & 0xC0));
+static INLINE void ClockFallNormal(void) {
+	if ((fdsn.b8shiftreg88 & 1))
+		fdsn.b24latch68 = fdsn.b24adder66;
+	fdsn.clockcount = (fdsn.clockcount + 1) & 7;
 }
 
-static DECLFW(FDSWaveWrite) {
-	if (SPSG[0x9] & 0x80)
-		fdso.cwave[A & 0x3f] = V & 0x3F;
+static INLINE int32 FDSDoSoundNormal(void) {
+	fdsn.count += fdsn.cycles;
+	if (fdsn.count >= ((int64)1 << 40)) {
+	dogk:
+		fdsn.count -= (int64)1 << 40;
+		ClockRiseNormal();
+		ClockFallNormal();
+		fdsn.envcount--;
+		if (fdsn.envcount <= 0) {
+			fdsn.envcount += fdsn.SPSG[0xA] * 3;
+			DoEnvNormal();
+		}
+	}
+	if (fdsn.count >= 32768) goto dogk;
+
+	{
+		int k = fdsn.amplitude[0];
+		if (k > 0x20) k = 0x20;
+		return (fdsn.cwave[fdsn.b24latch68 >> 19] * k) * 4 / ((fdsn.SPSG[0x9] & 0x3) + 2);
+	}
 }
 
+/* ---------- Mixed NSF/direct-mode core, matching the previous mixed/direct version ---------- */
 
 static int32 sign_x_to_s32(int n, int32 v) {
 	return ((int32)((uint32)v << (32 - n)) >> (32 - n));
 }
 
-static INLINE int32 FDSModCounterSigned(void) {
-	return sign_x_to_s32(7, (int32)(sweep_bias & 0x7F));
+static INLINE int32 FDSModCounterSignedMixed(void) {
+	return sign_x_to_s32(7, (int32)(fdsm.sweep_bias & 0x7F));
 }
 
-static INLINE uint32 FDSCalcWavePitch(void) {
-	/* Current NESdev/FDS behavior:
-	 *
-	 *   temp = signed_7bit_counter * 6bit_mod_gain
-	 *   if ((temp & 0x0f) && !(temp & 0x800)) temp += 0x20
-	 *   temp = ((temp + 0x400) >> 4) & 0xff
-	 *   wave_pitch = pitch * temp
-	 *
-	 * temp is centered around 0x40, so no modulation gives pitch * 64.
-	 */
-	int32 temp = FDSModCounterSigned() * (int32)(amplitude[1] & 0x3F);
+static INLINE uint32 FDSCalcWavePitchMixed(void) {
+	int32 temp = FDSModCounterSignedMixed() * (int32)(fdsm.amplitude[1] & 0x3F);
 
 	if ((temp & 0x0F) && !(temp & 0x800))
 		temp += 0x20;
@@ -551,138 +679,178 @@ static INLINE uint32 FDSCalcWavePitch(void) {
 	temp += 0x400;
 	temp = (temp >> 4) & 0xFF;
 
-	fdso.mod_out = temp - 0x40;
+	fdsm.mod_out = temp - 0x40;
 
-	return (uint32)((cwave_freq * (uint32)temp) & 0xFFFFF);
+	return (uint32)((fdsm.cwave_freq * (uint32)temp) & 0xFFFFF);
 }
 
-static void ClockMod(void) {
-	if (!mod_disabled) {
-		uint32 old_mod_pos = mod_pos;
+static INLINE void ClockModMixed(void) {
+	if (!fdsm.mod_disabled) {
+		uint32 old_mod_pos = fdsm.mod_pos;
 		uint32 old_frac = old_mod_pos & 0x0FFFU;
 
-		mod_pos = (mod_pos + (mod_freq & 0x0FFFU)) & 0x3FFFFU;
+		fdsm.mod_pos = (fdsm.mod_pos + (fdsm.mod_freq & 0x0FFFU)) & 0x3FFFFU;
 
-		/* Bit 6 of $4087 forces a carry from bit 11 every 16-CPU-cycle tick. */
-		if ((SPSG[0x7] & 0x40) || (old_frac + (mod_freq & 0x0FFFU) >= 0x1000U)) {
-			uint8 raw = fdso.mwave[(mod_pos >> 13) & 0x1F] & 0x07;
+		if ((fdsm.SPSG[0x7] & 0x40) || (old_frac + (fdsm.mod_freq & 0x0FFFU) >= 0x1000U)) {
+			uint8 raw = fdsm.mwave[(fdsm.mod_pos >> 13) & 0x1F] & 0x07;
 
 			if (raw == 4)
-				sweep_bias = 0;
+				fdsm.sweep_bias = 0;
 			else
-				sweep_bias = (sweep_bias + bias_tab[raw]) & 0x7F;
+				fdsm.sweep_bias = (fdsm.sweep_bias + bias_tab[raw]) & 0x7F;
 		}
 	}
 }
 
-static void ClockCarrier(void) {
-	/* The modulation formula is still active when the modulation table is
-	 * halted; only the mod table counter stops.  cwave_pos is a 24-bit wave
-	 * accumulator and the current waveform address is bits 18-23.
-	 */
-	cwave_pos = (cwave_pos + FDSCalcWavePitch()) & 0xFFFFFFU;
+static INLINE void ClockCarrierMixed(void) {
+	fdsm.cwave_pos = (fdsm.cwave_pos + FDSCalcWavePitchMixed()) & 0xFFFFFFU;
 }
 
-static int32 FDSDoSound(void) {
-	int32 prev_cwave_pos = cwave_pos;
-	fdso.count += fdso.cycles;
-	if (fdso.count >= ((int64)1 << 40)) {
-	dogk:
-		fdso.count -= (int64)1 << 40;
+static INLINE int32 FDSDoSoundMixed(void) {
+	uint32 prev_cwave_pos = fdsm.cwave_pos;
 
-		/* The existing FCEUX timing path reaches this point every 2 CPU cycles.
-		 * Real FDS wave and modulation units tick every 16 CPU cycles, so divide
-		 * this subtick by 8 before advancing the accumulators.
-		 */
-		fdso.tick_div = (fdso.tick_div + 1) & 7;
-		if (!fdso.tick_div) {
-			ClockMod();
-			if (!(SPSG[0x3] & 0x80)) {
-				ClockCarrier();
+	fdsm.count += fdsm.cycles;
+
+	while (fdsm.count >= ((int64)1 << 40)) {
+		fdsm.count -= ((int64)1 << 40);
+
+		fdsm.tick_div = (fdsm.tick_div + 1) & 7;
+		if (!fdsm.tick_div) {
+			ClockModMixed();
+			if (!(fdsm.SPSG[0x3] & 0x80)) {
+				ClockCarrierMixed();
 			}
 		}
 
-		/* Preserve the old envelope scheduler for compatibility; pitch accuracy is
-		 * corrected in the wave/modulation units above.
-		 */
-		fdso.envcount--;
-		if (fdso.envcount <= 0) {
-			fdso.envcount += SPSG[0xA] * 3;
-			DoEnv();
+		fdsm.envcount--;
+		if (fdsm.envcount <= 0) {
+			fdsm.envcount += fdsm.SPSG[0xA] * 3;
+			DoEnvMixed();
 		}
 	}
-	if (fdso.count >= 32768) goto dogk;
 
-	if ((cwave_pos ^ prev_cwave_pos) & (0x3F << 18)) {
-		int k = amplitude[0];
+	if ((fdsm.cwave_pos ^ prev_cwave_pos) & (0x3F << 18)) {
+		int k = fdsm.amplitude[0];
 		if (k > 0x20) k = 0x20;
-		fdso.sample_cache_out = (fdso.cwave[(cwave_pos >> 18) & 0x3F] * k) * 4 / ((SPSG[0x9] & 0x3) + 2);
+		fdsm.sample_cache_out = (fdsm.cwave[(fdsm.cwave_pos >> 18) & 0x3F] * k) * 4 / ((fdsm.SPSG[0x9] & 0x3) + 2);
 	}
-	return fdso.sample_cache_out;
+	return fdsm.sample_cache_out;
 }
-
-static int32 FBC = 0;
-
 
 static INLINE int32 FDSApplyVolume(int32 v)
 {
 	return (int32)(((int64)v * FSettings.FDSVolume) >> 8);
 }
 
-static void RenderSound(void) {
+static void RenderSoundNormal(void) {
 	int32 end, start;
 	int32 x;
 
-	start = FBC;
+	start = FBCNormal;
 	end = (SOUNDTS << 16) / soundtsinc;
 	if (end <= start)
 		return;
-	FBC = end;
+	FBCNormal = end;
 
-	if (!(SPSG[0x9] & 0x80))
+	if (!(fdsn.SPSG[0x9] & 0x80))
 		for (x = start; x < end; x++) {
-			uint32 t = FDSDoSound();
+			uint32 t = FDSDoSoundNormal();
 			t += t >> 1;
 			t >>= 4;
-			Wave[x >> 4] += FDSApplyVolume((int32)t); //(t>>2)-(t>>3); //>>3;
+			Wave[x >> 4] += FDSApplyVolume((int32)t);
 		}
+}
+
+static void RenderSoundMixed(void) {
+	int32 end, start;
+	int32 x;
+
+	start = FBCMixed;
+	end = (SOUNDTS << 16) / soundtsinc;
+	if (end <= start)
+		return;
+	FBCMixed = end;
+
+	if (!(fdsm.SPSG[0x9] & 0x80))
+		for (x = start; x < end; x++) {
+			uint32 t = FDSDoSoundMixed();
+			t += t >> 1;
+			t >>= 4;
+			Wave[x >> 4] += FDSApplyVolume((int32)t);
+		}
+}
+
+static void RenderSound(void) {
+	if (FDSUseMixedCore())
+		RenderSoundMixed();
+	else
+		RenderSoundNormal();
+}
+
+static void RenderSoundHQNormal(void) {
+	uint32 x;
+
+	if (!(fdsn.SPSG[0x9] & 0x80))
+		for (x = FBCNormal; x < SOUNDTS; x++) {
+			uint32 t = FDSDoSoundNormal();
+			t += t >> 1;
+			WaveHi[x] += FDSApplyVolume((int32)t);
+		}
+	FBCNormal = SOUNDTS;
+}
+
+static void RenderSoundHQMixed(void) {
+	uint32 x;
+
+	if (!(fdsm.SPSG[0x9] & 0x80))
+		for (x = FBCMixed; x < SOUNDTS; x++) {
+			uint32 t = FDSDoSoundMixed();
+			t += t >> 1;
+			WaveHi[x] += FDSApplyVolume((int32)t);
+		}
+	FBCMixed = SOUNDTS;
 }
 
 static void RenderSoundHQ(void) {
-	uint32 x; //mbg merge 7/17/06 - made this unsigned
-
-	if (!(SPSG[0x9] & 0x80))
-		for (x = FBC; x < SOUNDTS; x++) {
-			uint32 t = FDSDoSound();
-			t += t >> 1;
-			WaveHi[x] += FDSApplyVolume((int32)t); //(t<<2)-(t<<1);
-		}
-	FBC = SOUNDTS;
+	if (FDSUseMixedCore())
+		RenderSoundHQMixed();
+	else
+		RenderSoundHQNormal();
 }
 
 static void HQSync(int32 ts) {
-	FBC = ts;
+	if (FDSUseMixedCore())
+		FBCMixed = ts;
+	else
+		FBCNormal = ts;
 }
 
 void FDSSound(int c) {
 	RenderSound();
-	FBC = c;
+	if (FDSUseMixedCore())
+		FBCMixed = c;
+	else
+		FBCNormal = c;
 }
-
-static uint8 FDSNSFDirectMode = 0;
 
 void FDSNSFSetDirectMode(int enabled) {
 	FDSNSFDirectMode = enabled ? 1 : 0;
+	if (!FDSNSFDirectMode)
+		FDSMixedCoreLatched = 0;
+	else if (FCEU_NSFGetExpSoundCount() > 1 || FCEU_NSFIsExpSoundMuxEnabled())
+		FDSMixedCoreLatched = 1;
 }
 
 static void FDS_ESI(void) {
 	if (FSettings.SndRate) {
 		if (FSettings.soundq >= 1) {
-			fdso.cycles = (int64)1 << 39;
+			fdsn.cycles = (int64)1 << 39;
+			fdsm.cycles = (int64)1 << 39;
 		}
 		else {
-			fdso.cycles = ((int64)1 << 40) * FDSClock;
-			fdso.cycles /= FSettings.SndRate * 16;
+			fdsn.cycles = ((int64)1 << 40) * FDSClock;
+			fdsn.cycles /= FSettings.SndRate * 16;
+			fdsm.cycles = fdsn.cycles;
 		}
 	}
 	if (!FDSNSFDirectMode) {
@@ -694,7 +862,11 @@ static void FDS_ESI(void) {
 }
 
 void FDSSoundReset(void) {
-	memset(&fdso, 0, sizeof(fdso));
+	memset(&fdsn, 0, sizeof(fdsn));
+	memset(&fdsm, 0, sizeof(fdsm));
+	FBCNormal = 0;
+	FBCMixed = 0;
+	FDSMixedCoreLatched = 0;
 	FDS_ESI();
 	GameExpSound.HiSync = HQSync;
 	GameExpSound.HiFill = RenderSoundHQ;
@@ -725,6 +897,8 @@ void FDSNSFWrite(uint32 A, uint8 V) {
 }
 
 void FDSNSFInstallSoundHandlers(void) {
+	if (FDSNSFDirectMode && (FCEU_NSFGetExpSoundCount() > 1 || FCEU_NSFIsExpSoundMuxEnabled()))
+		FDSMixedCoreLatched = 1;
 	FDS_ESI();
 }
 
