@@ -1,7 +1,7 @@
 /* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
- *  Copyright (C) 2025 NewRisingSun
+ *  Copyright (C) 2026 NewRisingSun
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,44 +19,20 @@
  */
 
 #include "mapinc.h"
-
-static uint8_t reg[2];
+#include "asic_latch.h"
 
 static void sync() {
-	setprg16(0x8000, reg[1] & 0x18 | reg[0] & 0x07);
-	setprg16(0xC000, reg[1] & 0x18 | 0x07);
-	setchr8(0);
-	switch (reg[1] & 0x03) {
-	case 0x00: setmirror(MI_0); break;
-	case 0x01: setmirror(MI_V); break;
-	case 0x02: setmirror(MI_H); break;
-	case 0x03: setmirror(MI_1); break;
+	if (Latch_address & 0x10)
+		setprg32(0x8000, Latch_address >> 3 & 0x04 | Latch_address >> 1 & 0x03);
+	else {
+		setprg16(0x8000, Latch_address >> 2 & 0x08 | Latch_address & 0x07);
+		setprg16(0xC000, Latch_address >> 2 & 0x08 | Latch_address & 0x07);
 	}
+	setchr8(Latch_address >> 2 & 0x08 | Latch_address & 0x07);
+	setmirror(Latch_address & 0x08 ? MI_H : MI_V);
 }
 
-static DECLFW(writeReg) {
-	reg[V >> 7 & 1] = V;
-	sync();
-}
-
-static void reset() {
-	reg[0] = reg[1] = 0;
-	sync();
-}
-
-static void power() {
-	SetReadHandler(0x6000, 0xFFFF, CartBR);
-	SetWriteHandler(0x8000, 0xFFFF, writeReg);
-	reset();
-}
-
-static void stateRestore(int version) {
-	sync();
-}
-
-void Mapper598_Init(CartInfo* info) {
-	info->Power = power;
-	info->Reset = reset;
-	GameStateRestore = stateRestore;
-	AddExState(reg, 2, 0, "REGS");
+void Mapper622_Init(CartInfo* info) {
+	Latch_init(info, sync, 0x8000, 0xFFFF, NULL);
+	info->Reset = Latch_clear;
 }

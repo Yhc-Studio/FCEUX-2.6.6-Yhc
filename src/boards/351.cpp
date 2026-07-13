@@ -24,9 +24,9 @@
 #include "asic_mmc3.h"
 #include "asic_vrc2and4.h"
 
-static uint8 reg[4], dip;
-static uint8* CHRRAM = NULL;
-static uint8* PRGCHR = NULL;
+static uint8_t reg[4], dip;
+static uint8_t* CHRRAM = NULL;
+static uint8_t* PRGCHR = NULL;
 static int prgMask_CHRROM; /* PRG-ROM bank mask when CHR-ROM is active (outside of PRG address space */
 static int prgMask_CHRRAM; /* PRG-ROM bank mask when CHR-RAM is active (CHR-ROM becomes part of PRG address space) */
 
@@ -89,12 +89,12 @@ static void sync() {
 			MMC1_syncMirror();
 }
 
-DECLFW(VRC24_trapWriteReg) { /* When A11 is set, VRC4's A0 and A1 are swapped */
+static DECLFW(VRC24_trapWriteReg) { /* When A11 is set, VRC4's A0 and A1 are swapped */
 	if (A & 0x800) A = A & ~0xF | A >> 1 & 0x5 | A << 1 & 0xA;
 	VRC24_writeReg(A, V);
 }
 
-static void applyMode(uint8 clear) {
+static void applyMode(uint8_t clear) {
 	PPU_hook = NULL;
 	MapIRQHook = NULL;
 	GameHBIRQHook = NULL;
@@ -102,7 +102,7 @@ static void applyMode(uint8 clear) {
 		MMC3_activate(clear, sync, MMC3_TYPE_SHARP, NULL, NULL, NULL, NULL);
 	else
 		if (reg[0] & 0x01) {
-			if (reg[2] & 0x04)
+			if (reg[2] & 0x05)
 				VRC4_activate(clear, sync, 0x05, 0x0A, 1, NULL, NULL, NULL, NULL, NULL);
 			else
 				VRC4_activate(clear, sync, 0x02, 0x04, 1, NULL, NULL, NULL, NULL, NULL);
@@ -167,12 +167,12 @@ void Mapper351_Init(CartInfo* info) {
 	/* When CHR-RAM is enabled, CHR-ROM becomes part of PRG-ROM address space. */
 	prgMask_CHRROM = prgMask_CHRRAM = PRGsize[0] / 8192 - 1;
 	if (CHRRAMSIZE) {
-		uint8* newROM;
-		CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
+		uint8_t* newROM;
+		CHRRAM = (uint8_t*)FCEU_gmalloc(CHRRAMSIZE);
 		SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
 		AddExState(CHRRAM, CHRRAMSIZE, 0, "CRAM");
 		prgMask_CHRRAM = (PRGsize[0] + CHRsize[0]) / 8192 - 1;
-		newROM = (uint8*)FCEU_gmalloc(PRGsize[0] + CHRsize[0]);
+		newROM = (uint8_t*)FCEU_gmalloc(PRGsize[0] + CHRsize[0]);
 		memcpy(newROM, ROM, info->PRGRomSize);
 		memcpy(newROM + PRGsize[0], VROM, info->CHRRomSize);
 		FCEU_gfree(ROM);

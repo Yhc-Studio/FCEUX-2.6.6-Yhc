@@ -276,12 +276,38 @@ static void M200Sync(void) {
 	setprg16(0x8000, latche);
 	setprg16(0xC000, latche);
 	setchr8(latche);
-	setmirror(latche &(submapper == 1 ? 4 : 8) ? MI_H : MI_V);
+	setmirror(latche & (submapper == 1 ? 4 : 8) ? MI_H : MI_V);
 }
 
-void Mapper200_Init(CartInfo *info) {
+static DECLFR(Mapper200_interceptPRGRead_small) {
+	return latche & 4 && dipswitch & 1 || latche & 8 && dipswitch & 2 ? X.DB : CartBR(A);
+}
+
+static DECLFR(Mapper200_interceptPRGRead_large) {
+	if (A & 0xF)
+		return latche & 8 && dipswitch & 1 ? X.DB : CartBR(A);
+	else
+		return latche & 8 ? CartBR(A & ~0x1F | dipswitch & 0x1F) : CartBR(A);
+}
+
+static void Mapper200_Power() {
+	LatchPower();
+	dipswitch = 0;
+	SetReadHandler(0x8000, 0xFFFF, ROM_size == 4 ? Mapper200_interceptPRGRead_small : Mapper200_interceptPRGRead_large);
+	M200Sync();
+}
+
+static void Mapper200_Reset() {
+	latche = 0;
+	dipswitch++;
+	M200Sync();
+}
+
+void Mapper200_Init(CartInfo* info) {
 	submapper = info->submapper;
 	Latch_Init(info, M200Sync, NULL, 0x0000, 0x8000, 0xFFFF, 0);
+	info->Power = Mapper200_Power;
+	info->Reset = Mapper200_Reset;
 }
 
 /*------------------Map 201 -------------------------- - */
@@ -300,18 +326,13 @@ void Mapper201_Init(CartInfo *info) {
 //------------------ Map 202 ---------------------------
 
 static void M202Sync(void) {
-
-	if ((latche & 0x9) == 0x9)
-		setprg32(0x8000, latche >> 2);
-	else {
-		setprg32(0x8000, latche >> 1);
-		setprg32(0xC000, latche >> 1);
-	}
-	setchr8(latche >> 1);
-	if (latche & 1)
-		setmirror(MI_H);
-	else
-		setmirror(MI_V);
+	int32_t mirror = latche & 1;
+	int32_t bank = (latche >> 1) & 0x7;
+	int32_t select = (mirror & (bank >> 2));
+	setprg16(0x8000, select ? (bank & 6) | 0 : bank);
+	setprg16(0xc000, select ? (bank & 6) | 1 : bank);
+	setmirror(mirror ^ 1);
+	setchr8(bank);
 }
 
 void Mapper202_Init(CartInfo *info) {
@@ -380,7 +401,7 @@ void Mapper214_Init(CartInfo *info) {
 
 static void M217Sync(void) {
 	setprg32(0x8000, latche >> 2);
-	setchr8(latche);
+	setchr8(latche & 0x0F);
 }
 
 void Mapper217_Init(CartInfo *info) {
@@ -490,89 +511,6 @@ static void M231Sync(void) {
 
 void Mapper231_Init(CartInfo *info) {
 	Latch_Init(info, M231Sync, NULL, 0x0000, 0x8000, 0xFFFF, 0);
-}
-
-//------------------ Map 242 ---------------------------
-
-static uint8 M242TwoChips;
-static void M242Sync(void) {
-	uint32 S = latche & 1;
-	uint32 p = (latche >> 2) & 0x1F;
-	uint32 L = (latche >> 9) & 1;
-
-	if (M242TwoChips) {
-		if (latche & 0x600)
-		{	/* First chip */
-			p &= 0x1F;
-		}
-		else
-		{	/* Second chip */
-			p &= 0x07;
-			p += 0x20;
-		}
-	}
-
-	if ((latche >> 7) & 1) {
-		if (S) {
-			setprg32(0x8000, p >> 1);
-		}
-		else {
-			setprg16(0x8000, p);
-			setprg16(0xC000, p);
-		}
-	}
-	else {
-		if (S) {
-			if (L) {
-				setprg16(0x8000, p & 0x3E);
-				setprg16(0xC000, p | 7);
-			}
-			else {
-				setprg16(0x8000, p & 0x3E);
-				setprg16(0xC000, p & 0x38);
-			}
-		}
-		else {
-			if (L) {
-				setprg16(0x8000, p);
-				setprg16(0xC000, p | 7);
-			}
-			else {
-				setprg16(0x8000, p);
-				setprg16(0xC000, p & 0x38);
-			}
-		}
-	}
-	//if (!hasBattery && (latche & 0x80) == 0x80 && (ROM_size * 16) > 256)
-	//	/* CHR-RAM write protect hack, needed for some multicarts */
-	//	SetupCartCHRMapping(0, CHRptr[0], 0x2000, 0);
-	//else
-	//	SetupCartCHRMapping(0, CHRptr[0], 0x2000, 1);
-	setmirror(((latche >> 1) & 1) ^ 1);
-	setchr8(0);
-	setprg8r(0x10, 0x6000, 0);
-}
-
-static DECLFR(M242Read) {
-	if (latche & 0x0100 && (latche & 0x00FF) == 0)
-		return CartBR(A | dipswitch);
-	else
-		return CartBR(A);
-}
-
-static void Mapper242_Reset(void) {
-	dipswitch++;
-	dipswitch &= 31;
-	latche = 0;
-	M242Sync();
-}
-
-void Mapper242_Init(CartInfo* info) {
-	dipswitch = 0;
-	M242TwoChips = info->PRGRomSize & 0x20000 && info->PRGRomSize > 0x20000;
-	Latch_Init(info, M242Sync, M242Read, 0x0000, 0x8000, 0xFFFF, info->ines2 && (info->PRGRamSize || info->PRGRamSaveSize) || info->battery);
-	info->Reset = Mapper242_Reset;
-	AddExState(&dipswitch, 1, 0, "DIPSW");
 }
 
 //------------------ 190in1 ---------------------------

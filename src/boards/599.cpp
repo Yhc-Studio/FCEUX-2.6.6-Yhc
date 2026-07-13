@@ -21,13 +21,9 @@
 #include "mapinc.h"
 #include "asic_latch.h"
 #include "cartram.h"
-#include "../ines.h"
+#include "ines.h"
 
-static uint8 pad;
-
-static DECLFR(readOB) {
-	return X.DB;
-}
+static uint8_t pad;
 
 static void sync() {
 	/* There are two PRG-ROM chips, the first can be either 256 KiB or 512 KiB in size, the second is always 128 KiB in size */
@@ -52,7 +48,6 @@ static void sync() {
 		setprg16(0x8000, prgOR | Latch_address >> 2 & prgAND);
 		setprg16(0xC000, prgOR);
 	}
-	SetReadHandler(0x8000, 0xFFFF, ROM_size >= 32 && Latch_address & 0x200 && pad & 1 ? readOB : CartBR);
 	if (Latch_address & 0x400)
 		setchr8(Latch_address >> 6 & ~0x03 | Latch_data & 0x03);
 	else
@@ -60,13 +55,18 @@ static void sync() {
 	setmirror(Latch_address & 0x002 ? MI_H : MI_V);
 }
 
-static void trapLatchWrite(uint16* newAddress, uint8* newValue, uint8 romValue) { /* Latch address bit 14 is an address lock bit */
+static void trapLatchWrite(uint16_t* newAddress, uint8_t* newValue, uint8_t romValue) { /* Latch address bit 14 is an address lock bit */
 	if (Latch_address & 0x4000) *newAddress = Latch_address;
+}
+
+static DECLFR(interceptPRGRead) {
+	return Latch_address & 0x200 && ~Latch_address & 0x400 && pad & 1 ? X.DB : CartBR(A);
 }
 
 static void power() {
 	pad = 0;
 	Latch_power();
+	if (ROM_size >= 32) SetReadHandler(0x8000, 0xFFFF, interceptPRGRead);
 }
 
 static void reset() {

@@ -1,7 +1,7 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCEUmm - NES/Famicom Emulator
  *
  * Copyright notice for this file:
- *  Copyright (C) 2025 NewRisingSun
+ *  Copyright (C) 2026 NewRisingSun
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,47 +16,47 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *
  */
 
 #include "mapinc.h"
+#include "asic_mmc3.h"
 
-static uint8_t reg[2];
+static uint8_t reg;
 
 static void sync() {
-	setprg16(0x8000, reg[1] & 0x18 | reg[0] & 0x07);
-	setprg16(0xC000, reg[1] & 0x18 | 0x07);
-	setchr8(0);
-	switch (reg[1] & 0x03) {
-	case 0x00: setmirror(MI_0); break;
-	case 0x01: setmirror(MI_V); break;
-	case 0x02: setmirror(MI_H); break;
-	case 0x03: setmirror(MI_1); break;
+	if (reg & 0x40) {
+		setprg16(0x8000, reg >> 3 & 0x0E | reg >> 7 & 0x01);
+		setprg16(0xC000, reg >> 3 & 0x0E | reg >> 7 & 0x01);
 	}
+	else
+		setprg32(0x8000, reg >> 4 & 0x07);
+	MMC3_syncCHR(0x7F, reg << 1 & 0x80);
+	MMC3_syncMirror();
 }
 
 static DECLFW(writeReg) {
-	reg[V >> 7 & 1] = V;
-	sync();
+	if (A & 0x100) {
+		reg = V;
+		sync();
+	}
 }
 
 static void reset() {
-	reg[0] = reg[1] = 0;
-	sync();
+	reg = 0x40;
+	MMC3_clear();
 }
 
 static void power() {
-	SetReadHandler(0x6000, 0xFFFF, CartBR);
-	SetWriteHandler(0x8000, 0xFFFF, writeReg);
-	reset();
+	reg = 0x40;
+	MMC3_power();
+	SetWriteHandler(0x4020, 0x5FFF, writeReg);
 }
 
-static void stateRestore(int version) {
-	sync();
-}
-
-void Mapper598_Init(CartInfo* info) {
+void Mapper620_Init(CartInfo* info) {
+	MMC3_init(info, sync, MMC3_TYPE_AX5202P, NULL, NULL, NULL, writeReg);
 	info->Power = power;
 	info->Reset = reset;
-	GameStateRestore = stateRestore;
-	AddExState(reg, 2, 0, "REGS");
+	AddExState(&reg, 1, 0, "EXPR");
 }
