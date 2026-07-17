@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+﻿/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2002 Xodnizel
@@ -37,6 +37,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <climits>
+#include <stdint.h>
 
 uint8 *Page[32], *VPage[8];
 uint8 **VPageR = VPage;
@@ -45,6 +46,27 @@ uint8 *MMC5SPRVPage[8];
 uint8 *MMC5BGVPage[8];
 
 static uint8 PRGIsRAM[32];  /* This page is/is not PRG RAM. */
+
+/*
+ * Older FCEUX code stores Page[] as "base pointer minus CPU address" and later
+ * reads with Page[A >> 11][A].  That relies on pointer arithmetic outside the
+ * allocated object.  It often works in 32-bit builds, but it is undefined
+ * behavior and is especially fragile in x64 optimized builds.
+ *
+ * Keep the public Page[] layout for compatibility, but perform the offset math
+ * through uintptr_t and dereference only the final translated address.
+ */
+static inline uint8* FCEU_MakePageOffsetPtr(uint8* p, uint32 A)
+{
+	return p ? (uint8*)((uintptr_t)p - (uintptr_t)A) : 0;
+}
+
+static inline uint8* FCEU_GetPageAddress(uint32 A)
+{
+	uint8* base = Page[A >> 11];
+	return base ? (uint8*)((uintptr_t)base + (uintptr_t)A) : 0;
+}
+
 
 /* 16 are (sort of) reserved for UNIF/iNES and 16 to map other stuff. */
 uint8 CHRram[32];
@@ -85,7 +107,7 @@ static INLINE void setpageptr(int s, uint32 A, uint8 *p, int ram) {
 	if (p)
 		for (x = (s >> 1) - 1; x >= 0; x--) {
 			PRGIsRAM[AB + x] = ram;
-			Page[AB + x] = p - A;
+			Page[AB + x] = FCEU_MakePageOffsetPtr(p, A);
 		}
 	else
 		for (x = (s >> 1) - 1; x >= 0; x--) {
@@ -101,7 +123,7 @@ void ResetCartMapping(void) {
 	PPU_ResetHooks();
 
 	for (x = 0; x < 32; x++) {
-		Page[x] = nothing - x * 2048;
+		Page[x] = FCEU_MakePageOffsetPtr(nothing, x * 2048);
 		PRGptr[x] = CHRptr[x] = 0;
 		PRGsize[x] = CHRsize[x] = 0;
 	}
@@ -141,20 +163,20 @@ void SetupCartCHRMapping(int chip, uint8 *p, uint32 size, int ram) {
 }
 
 DECLFR(CartBR) {
-	return Page[A >> 11][A];
+	uint8* p = FCEU_GetPageAddress(A);
+	return p ? *p : X.DB;
 }
 
 DECLFW(CartBW) {
 	//printf("Ok: %04x:%02x, %d\n",A,V,PRGIsRAM[A>>11]);
-	if (PRGIsRAM[A >> 11] && Page[A >> 11])
-		Page[A >> 11][A] = V;
+	uint8* p = FCEU_GetPageAddress(A);
+	if (PRGIsRAM[A >> 11] && p)
+		*p = V;
 }
 
 DECLFR(CartBROB) {
-	if (!Page[A >> 11])
-		return(X.DB);
-	else
-		return Page[A >> 11][A];
+	uint8* p = FCEU_GetPageAddress(A);
+	return p ? *p : X.DB;
 }
 
 void setprg2r(int r, uint32 A, uint32 V) {
@@ -364,7 +386,7 @@ bool FCEU_OpenGenie(void)
 		fp = FCEUD_UTF8fopen(fn, "rb");
 		if (!fp)
 		{
-			FCEU_PrintError("Error opening Game Genie ROM image!\nIt should be named \"gg.rom\"!");
+			FCEU_PrintError(" Game Genie ROMʱ!\nӦΪ \"gg.rom\"!");
 			free(GENIEROM);
 			GENIEROM = 0;
 			return true;
@@ -372,7 +394,7 @@ bool FCEU_OpenGenie(void)
 		if (fread(GENIEROM, 1, 16, fp) != 16)
 		{
  grerr:
-			FCEU_PrintError("Error reading from Game Genie ROM image!");
+			FCEU_PrintError("ȡGame Genie ROMʱ!");
 			free(GENIEROM);
 			GENIEROM = 0;
 			fclose(fp);
@@ -545,7 +567,7 @@ void FCEU_SaveGameSave(CartInfo *LocalHWInfo)
 		std::string soot = FCEU_MakeFName(FCEUMKF_SAV, 0, "sav");
 		if ((sp = FCEUD_UTF8fopen(soot, "wb")) == NULL)
 		{
-			FCEU_PrintError("WRAM file \"%s\" cannot be written to.\n", soot.c_str());
+			FCEU_PrintError("WRAMļ \"%s\" ޷д.\n", soot.c_str());
 		}
 		else
 		{
@@ -580,7 +602,7 @@ void FCEU_LoadGameSave(CartInfo *LocalHWInfo)
 				{
 					if ( fread(LocalHWInfo->SaveGame[x].bufptr, 1, LocalHWInfo->SaveGame[x].buflen, sp) != LocalHWInfo->SaveGame[x].buflen )
 					{
-						FCEU_printf("Warning save game data read came up short!\n");
+						FCEU_printf("汣Ϸݶȡ!\n");
 					}
 				}
 			}

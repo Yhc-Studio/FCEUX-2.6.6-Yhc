@@ -307,6 +307,9 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
       <Command>xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z.dll" "$(OutDir)"
 xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
+    <Manifest>
+      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Midl>
@@ -345,6 +348,9 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
       <Command>xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z.dll" "$(OutDir)"
 xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
+    <Manifest>
+      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='PublicRelease|x64'">
     <Midl>
@@ -441,6 +447,7 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\236.cpp" />
     <ClCompile Include="..\src\boards\237.cpp" />
     <ClCompile Include="..\src\boards\239.cpp" />
+    <ClCompile Include="..\src\boards\242.cpp" />
     <ClCompile Include="..\src\boards\244.cpp" />
     <ClCompile Include="..\src\boards\246.cpp" />
     <ClCompile Include="..\src\boards\252.cpp" />
@@ -667,7 +674,14 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\616.cpp" />
     <ClCompile Include="..\src\boards\617.cpp" />
     <ClCompile Include="..\src\boards\618.cpp" />
+    <ClCompile Include="..\src\boards\619.cpp" />
     <ClCompile Include="..\src\boards\62.cpp" />
+    <ClCompile Include="..\src\boards\620.cpp" />
+    <ClCompile Include="..\src\boards\621.cpp" />
+    <ClCompile Include="..\src\boards\622.cpp" />
+    <ClCompile Include="..\src\boards\623.cpp" />
+    <ClCompile Include="..\src\boards\624.cpp" />
+    <ClCompile Include="..\src\boards\625.cpp" />
     <ClCompile Include="..\src\boards\65.cpp" />
     <ClCompile Include="..\src\boards\67.cpp" />
     <ClCompile Include="..\src\boards\68.cpp" />
@@ -694,6 +708,7 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\79.cpp" />
     <ClCompile Include="..\src\boards\80.cpp" />
     <ClCompile Include="..\src\boards\80013-B.cpp" />
+    <ClCompile Include="..\src\boards\800_0.cpp" />
     <ClCompile Include="..\src\boards\81.cpp" />
     <ClCompile Include="..\src\boards\301.cpp" />
     <ClCompile Include="..\src\boards\82_552.cpp" />
@@ -1279,7 +1294,9 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\lua-engine.cpp" />
     <ClCompile Include="..\src\movie.cpp" />
     <ClCompile Include="..\src\netplay.cpp" />
-    <ClCompile Include="..\src\nsf.cpp" />
+    <ClCompile Include="..\src\nsf.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Disabled</Optimization>
+    </ClCompile>
     <ClCompile Include="..\src\oldmovie.cpp" />
     <ClCompile Include="..\src\palette.cpp" />
     <ClCompile Include="..\src\ppu.cpp" />
@@ -1294,6 +1311,8 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\asm.h" />
+    <ClInclude Include="..\src\boards\800_0.h" />
+    <ClInclude Include="..\src\boards\800_base.h" />
     <ClInclude Include="..\src\boards\asic_fme7.h" />
     <ClInclude Include="..\src\boards\asic_h3001.h" />
     <ClInclude Include="..\src\boards\asic_latch.h" />

@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35327.3
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fceux", "vc14_fceux.vcxproj", "{6893EF44-FEA3-46DF-B236-C4C200F54294}"
 EndProject
 Global
@@ -17,8 +19,8 @@ Global
 		{6893EF44-FEA3-46DF-B236-C4C200F54294}.Debug|Win32.Build.0 = Debug|Win32
 		{6893EF44-FEA3-46DF-B236-C4C200F54294}.Debug|x64.ActiveCfg = Debug|x64
 		{6893EF44-FEA3-46DF-B236-C4C200F54294}.Debug|x64.Build.0 = Debug|x64
-		{6893EF44-FEA3-46DF-B236-C4C200F54294}.PublicRelease|Win32.ActiveCfg = PublicRelease|Win32
-		{6893EF44-FEA3-46DF-B236-C4C200F54294}.PublicRelease|Win32.Build.0 = PublicRelease|Win32
+		{6893EF44-FEA3-46DF-B236-C4C200F54294}.PublicRelease|Win32.ActiveCfg = Release|Win32
+		{6893EF44-FEA3-46DF-B236-C4C200F54294}.PublicRelease|Win32.Build.0 = Release|Win32
 		{6893EF44-FEA3-46DF-B236-C4C200F54294}.PublicRelease|x64.ActiveCfg = PublicRelease|x64
 		{6893EF44-FEA3-46DF-B236-C4C200F54294}.PublicRelease|x64.Build.0 = PublicRelease|x64
 		{6893EF44-FEA3-46DF-B236-C4C200F54294}.Release|Win32.ActiveCfg = Release|Win32
@@ -28,5 +30,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5235A21F-6C27-4873-9538-7FC48DF0B50C}
 	EndGlobalSection
 EndGlobal

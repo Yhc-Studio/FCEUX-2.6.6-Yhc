@@ -223,7 +223,10 @@ static uint8 NSFROM[] =
 
 static DECLFR(NSFROMRead)
 {
-	return (NSFROM - 0x3800)[A];
+	if (A >= 0x3800 && A < 0x3800 + sizeof(NSFROM))
+		return NSFROM[A - 0x3800];
+
+	return X.DB;
 }
 
 static uint8 doreset = 0; //state
@@ -1838,7 +1841,10 @@ static void NSFDrawText(uint8* XBuf, int x, int y, const char* text, int color)
 	strncpy(tmp, text, maxChars);
 	tmp[maxChars] = 0;
 
-	DrawTextTrans(ClipSidesOffset + XBuf + y * 256 + x, 256, (uint8*)tmp, color);
+	// NSF draws its own full 256x240 UI.  Do not add ClipSidesOffset here;
+	// NTSC/clip modes would shift text inward while rectangles and pixels stay
+	// at their original coordinates.
+	DrawTextTrans(XBuf + y * 256 + x, 256, (uint8*)tmp, color);
 }
 
 static void NSFPutPixel(uint8* XBuf, int x, int y, int color)
@@ -1911,7 +1917,7 @@ static void NSFDrawStar(uint8* XBuf, int x, int y, int z)
 		return;
 
 	if (z > 170)
-		color = 0x80;
+		color = kNSFColorDimGray;
 	else if (z > 80)
 		color = kNSFColorDimGray;
 	else
@@ -3311,7 +3317,7 @@ void DrawNSF(uint8* XBuf)
 {
 	if (vismode == 0) return;
 
-	memset(XBuf, 0, 256 * 240);
+	memset(XBuf, kNSFColorBlack, 256 * 240);
 	memset(XDBuf, 0, 256 * 240);
 
 	NSFDrawStarfield(XBuf);

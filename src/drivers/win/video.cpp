@@ -35,7 +35,7 @@ void InputScreenChanged(int fs);
 void UpdateRendBounds();
 
 static DDCAPS caps;
-static int mustrestore=0;
+static int mustrestore = 0;
 static DWORD CBM[3];
 
 static int bpp;
@@ -45,8 +45,8 @@ static int veflags;
 int directDrawModeWindowed = DIRECTDRAW_MODE_SOFTWARE;
 int directDrawModeFullscreen = DIRECTDRAW_MODE_FULL;
 
-int fssync=0;
-int winsync=0;
+int fssync = 0;
+int winsync = 0;
 
 int winspecial = 0;
 int NTSCwinspecial = 0;
@@ -54,7 +54,7 @@ int vmod = 0;
 
 vmdef vmodes[11] =
 {
-	{0,0,0,VMDF_DXBLT|VMDF_STRFS,1,1,0},	// Custom - set to current resolution at the first launch
+	{0,0,0,VMDF_DXBLT | VMDF_STRFS,1,1,0},	// Custom - set to current resolution at the first launch
 	{320,240,8,0,1,1,0}, //1
 	{512,384,8,0,1,1,0}, //2
 	{640,480,32,0,1,1,0}, //3
@@ -64,38 +64,59 @@ vmdef vmodes[11] =
 	{1024,768,32,VMDF_DXBLT,4,3,0}, //7
 	{1280,1024,32,VMDF_DXBLT,5,4,0}, //8
 	{1600,1200,32,VMDF_DXBLT,6,5,0}, //9
-	{800,600,32,VMDF_DXBLT|VMDF_STRFS,0,0}    //10
+	{800,600,32,VMDF_DXBLT | VMDF_STRFS,0,0}    //10
 };
 
 extern uint8 PALRAM[0x20];
 extern bool palupdate;
 
-PALETTEENTRY *color_palette;
+PALETTEENTRY* color_palette;
 
-static int PaletteChanged=0;
+static int PaletteChanged = 0;
 
-LPDIRECTDRAWCLIPPER lpClipper=0;
-LPDIRECTDRAW  lpDD=0;
-LPDIRECTDRAW7 lpDD7=0;
+static int NSFVideoNoClip(void)
+{
+	return (GameInfo && GameInfo->type == GIT_NSF) ? 1 : 0;
+}
+
+static int NSFVideoClipLeft(void)
+{
+	return NSFVideoNoClip() ? 0 : VNSCLIP;
+}
+
+static int NSFVideoClipRight(void)
+{
+	return NSFVideoNoClip() ? 256 : (256 - VNSCLIP);
+}
+
+static int NSFVideoNTSCXRes(int special)
+{
+	return (special == 3 && !NSFVideoNoClip()) ? 301 : 256;
+}
+
+
+LPDIRECTDRAWCLIPPER lpClipper = 0;
+LPDIRECTDRAW  lpDD = 0;
+LPDIRECTDRAW7 lpDD7 = 0;
 LPDIRECTDRAWPALETTE lpddpal = 0;
 
 DDSURFACEDESC2 ddsd;
 DDSURFACEDESC2 ddsdback;
 
-LPDIRECTDRAWSURFACE7  lpDDSPrimary=0;
-LPDIRECTDRAWSURFACE7  lpDDSDBack=0;
-LPDIRECTDRAWSURFACE7  lpDDSBack=0;
+LPDIRECTDRAWSURFACE7  lpDDSPrimary = 0;
+LPDIRECTDRAWSURFACE7  lpDDSDBack = 0;
+LPDIRECTDRAWSURFACE7  lpDDSBack = 0;
 
 DDBLTFX blitfx = { sizeof(DDBLTFX) };
 
-RECT bestfitRect = {0};
+RECT bestfitRect = { 0 };
 
 #define RELEASE(x) if(x) { x->Release(); x = 0; }
 
-static void ShowDDErr(char *s)
+static void ShowDDErr(char* s)
 {
 	char tempo[512];
-	sprintf(tempo,"DirectDraw: %s",s);
+	sprintf(tempo, "DirectDraw: %s", s);
 	FCEUD_PrintError(tempo);
 }
 
@@ -103,14 +124,15 @@ int RestoreDD(int w)
 {
 	if (w == 1)	// lpDDSBack
 	{
-		if(!lpDDSBack) return 0;
-		if(IDirectDrawSurface7_Restore(lpDDSBack)!=DD_OK) return 0;
-	} else	// 0 means lpDDSPrimary
-	{
-		if(!lpDDSPrimary) return 0;
-		if(IDirectDrawSurface7_Restore(lpDDSPrimary)!=DD_OK) return 0;
+		if (!lpDDSBack) return 0;
+		if (IDirectDrawSurface7_Restore(lpDDSBack) != DD_OK) return 0;
 	}
-	veflags|=1;
+	else	// 0 means lpDDSPrimary
+	{
+		if (!lpDDSPrimary) return 0;
+		if (IDirectDrawSurface7_Restore(lpDDSPrimary) != DD_OK) return 0;
+	}
+	veflags |= 1;
 	return 1;
 }
 
@@ -119,14 +141,14 @@ void FCEUD_SetPalette(unsigned char index, unsigned char r, unsigned char g, uns
 	color_palette[index].peRed = r;
 	color_palette[index].peGreen = g;
 	color_palette[index].peBlue = b;
-	PaletteChanged=1;
+	PaletteChanged = 1;
 }
 
-void FCEUD_GetPalette(unsigned char i, unsigned char *r, unsigned char *g, unsigned char *b)
+void FCEUD_GetPalette(unsigned char i, unsigned char* r, unsigned char* g, unsigned char* b)
 {
-	*r=color_palette[i].peRed;
-	*g=color_palette[i].peGreen;
-	*b=color_palette[i].peBlue;
+	*r = color_palette[i].peRed;
+	*g = color_palette[i].peGreen;
+	*b = color_palette[i].peBlue;
 }
 
 static bool firstInitialize = true;
@@ -140,7 +162,7 @@ static int InitializeDDraw(int fs)
 	}
 
 	if ((fs && directDrawModeFullscreen == DIRECTDRAW_MODE_SOFTWARE) || (!fs && directDrawModeWindowed == DIRECTDRAW_MODE_SOFTWARE))
-		ddrval = DirectDrawCreate((GUID FAR *)DDCREATE_EMULATIONONLY, &lpDD, NULL);
+		ddrval = DirectDrawCreate((GUID FAR*)DDCREATE_EMULATIONONLY, &lpDD, NULL);
 	else
 		ddrval = DirectDrawCreate(NULL, &lpDD, NULL);
 
@@ -152,7 +174,7 @@ static int InitializeDDraw(int fs)
 	}
 
 	//mbg merge 7/17/06 changed:
-	ddrval = IDirectDraw_QueryInterface(lpDD,IID_IDirectDraw7,(LPVOID *)&lpDD7);
+	ddrval = IDirectDraw_QueryInterface(lpDD, IID_IDirectDraw7, (LPVOID*)&lpDD7);
 	//ddrval = IDirectDraw_QueryInterface(lpDD,&IID_IDirectDraw7,(LPVOID *)&lpDD7);
 	IDirectDraw_Release(lpDD);
 
@@ -163,8 +185,8 @@ static int InitializeDDraw(int fs)
 		return 0;
 	}
 
-	caps.dwSize=sizeof(caps);
-	if(IDirectDraw7_GetCaps(lpDD7,&caps,0)!=DD_OK)
+	caps.dwSize = sizeof(caps);
+	if (IDirectDraw7_GetCaps(lpDD7, &caps, 0) != DD_OK)
 	{
 		//ShowDDErr("Error getting capabilities.");
 		FCEU_printf("Error getting capabilities.\n");
@@ -177,10 +199,10 @@ static int GetBPP(void)
 {
 	DDPIXELFORMAT ddpix;
 
-	memset(&ddpix,0,sizeof(ddpix));
-	ddpix.dwSize=sizeof(ddpix);
+	memset(&ddpix, 0, sizeof(ddpix));
+	ddpix.dwSize = sizeof(ddpix);
 
-	ddrval=IDirectDrawSurface7_GetPixelFormat(lpDDSPrimary,&ddpix);
+	ddrval = IDirectDrawSurface7_GetPixelFormat(lpDDSPrimary, &ddpix);
 	if (ddrval != DD_OK)
 	{
 		//ShowDDErr("Error getting primary surface pixel format.");
@@ -188,13 +210,13 @@ static int GetBPP(void)
 		return 0;
 	}
 
-	if(ddpix.dwFlags&DDPF_RGB)
+	if (ddpix.dwFlags & DDPF_RGB)
 	{
 		//mbg merge 7/17/06 removed silly dummy union stuff now that we have c++
-		bpp=ddpix.dwRGBBitCount;
-		CBM[0]=ddpix.dwRBitMask;
-		CBM[1]=ddpix.dwGBitMask;
-		CBM[2]=ddpix.dwBBitMask;
+		bpp = ddpix.dwRGBBitCount;
+		CBM[0] = ddpix.dwRBitMask;
+		CBM[1] = ddpix.dwGBitMask;
+		CBM[2] = ddpix.dwBBitMask;
 	}
 	else
 	{
@@ -202,7 +224,7 @@ static int GetBPP(void)
 		FCEU_printf("RGB data not valid.\n");
 		return 0;
 	}
-	if(bpp==15) bpp=16;
+	if (bpp == 15) bpp = 16;
 
 	return 1;
 }
@@ -218,8 +240,8 @@ static int InitBPPStuff(int fs)
 		break;
 	}
 
-	InitBlitToHigh(bpp >> 3, CBM[0], CBM[1], CBM[2], 0, fs?vmodes[vmod].special:winspecial,specfilteropt);
-	
+	InitBlitToHigh(bpp >> 3, CBM[0], CBM[1], CBM[2], 0, fs ? vmodes[vmod].special : winspecial, specfilteropt);
+
 	return 1;
 }
 
@@ -265,7 +287,8 @@ void recalculateBestFitRect(int width, int height)
 		}
 		bestfitRect.left = center_x - (int)(new_width / 2);
 		bestfitRect.right = bestfitRect.left + new_width;
-	} else
+	}
+	else
 	{
 		// the window is taller than emulated screen
 		double new_width = width;
@@ -293,44 +316,44 @@ int SetVideoMode(int fs)
 {
 	int specmul = 1;    // Special scaler size multiplier
 
-	if(fs)
-		if(!vmod)
-			if(!RecalcCustom())
+	if (fs)
+		if (!vmod)
+			if (!RecalcCustom())
 				return(0);
 
-	vflags=0;
-	veflags=1;
-	PaletteChanged=1;
+	vflags = 0;
+	veflags = 1;
+	PaletteChanged = 1;
 
 	ResetVideo();
-	fullscreen=fs;
+	fullscreen = fs;
 
-	if(!InitializeDDraw(fs)) return(1);     // DirectDraw not initialized
+	if (!InitializeDDraw(fs)) return(1);     // DirectDraw not initialized
 
 
-	if(!fs)
-	{ 
+	if (!fs)
+	{
 		int xres = 256;
 		// -Video Modes Tag-
-		if(winspecial <= 3 && winspecial >= 1)
+		if (winspecial <= 3 && winspecial >= 1)
 			specmul = 2;
-		else if(winspecial >= 4 && winspecial <= 5)
+		else if (winspecial >= 4 && winspecial <= 5)
 			specmul = 3;
-		else if(winspecial >= 6 && winspecial <= 13)
+		else if (winspecial >= 6 && winspecial <= 13)
 			specmul = winspecial - 4; // magic assuming prescales are winspecial >= 6
-		else if(winspecial == 14)
+		else if (winspecial == 14)
 			specmul = 3;
 		else
 			specmul = 1;
 
-		if(winspecial == 3)
-			xres = 301;
+		if (winspecial == 3)
+			xres = NSFVideoNTSCXRes(winspecial);
 
 		ShowCursorAbs(1);
-		windowedfailed=1;
+		windowedfailed = 1;
 		HideFWindow(0);
 
-		ddrval = IDirectDraw7_SetCooperativeLevel ( lpDD7, hAppWnd, DDSCL_NORMAL);
+		ddrval = IDirectDraw7_SetCooperativeLevel(lpDD7, hAppWnd, DDSCL_NORMAL);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error setting cooperative level.");
@@ -339,12 +362,12 @@ int SetVideoMode(int fs)
 		}
 
 		//Beginning
-		memset(&ddsd,0,sizeof(ddsd));
+		memset(&ddsd, 0, sizeof(ddsd));
 		ddsd.dwSize = sizeof(ddsd);
 		ddsd.dwFlags = DDSD_CAPS;
 		ddsd.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
 
-		ddrval = IDirectDraw7_CreateSurface ( lpDD7, &ddsd, &lpDDSPrimary,(IUnknown FAR*)NULL);
+		ddrval = IDirectDraw7_CreateSurface(lpDD7, &ddsd, &lpDDSPrimary, (IUnknown FAR*)NULL);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error creating primary surface.");
@@ -352,13 +375,13 @@ int SetVideoMode(int fs)
 			return 1;
 		}
 
-		memset(&ddsdback,0,sizeof(ddsdback));
-		ddsdback.dwSize=sizeof(ddsdback);
+		memset(&ddsdback, 0, sizeof(ddsdback));
+		ddsdback.dwSize = sizeof(ddsdback);
 		ddsdback.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
-		ddsdback.ddsCaps.dwCaps= DDSCAPS_OFFSCREENPLAIN;
+		ddsdback.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
 
-		ddsdback.dwWidth=xres*specmul;
-		ddsdback.dwHeight=FSettings.TotalScanlines() * ((winspecial == 14) ? 1 : specmul);
+		ddsdback.dwWidth = xres * specmul;
+		ddsdback.dwHeight = FSettings.TotalScanlines() * ((winspecial == 14) ? 1 : specmul);
 
 		if (directDrawModeWindowed == DIRECTDRAW_MODE_SURFACE_IN_RAM)
 			// create the buffer in system memory
@@ -371,22 +394,22 @@ int SetVideoMode(int fs)
 			FCEU_printf("Error creating secondary surface.\n");
 			return 0;
 		}
-		
-		if(!GetBPP())
+
+		if (!GetBPP())
 			return 0;
 
 		//only 16,24,32 bpp are supported now
-		if(bpp!=16 && bpp!=24 && bpp!=32)
+		if (bpp != 16 && bpp != 24 && bpp != 32)
 		{
 			//ShowDDErr("Current bit depth not supported!");
 			FCEU_printf("Current bit depth not supported!\n");
 			return 0;
 		}
 
-		if(!InitBPPStuff(fs))
+		if (!InitBPPStuff(fs))
 			return 0;
 
-		ddrval=IDirectDraw7_CreateClipper(lpDD7,0,&lpClipper,0);
+		ddrval = IDirectDraw7_CreateClipper(lpDD7, 0, &lpClipper, 0);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error creating clipper.");
@@ -394,14 +417,14 @@ int SetVideoMode(int fs)
 			return 0;
 		}
 
-		ddrval=IDirectDrawClipper_SetHWnd(lpClipper,0,hAppWnd);
+		ddrval = IDirectDrawClipper_SetHWnd(lpClipper, 0, hAppWnd);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error setting clipper window.");
 			FCEU_printf("Error setting clipper window.\n");
 			return 0;
 		}
-		ddrval=IDirectDrawSurface7_SetClipper(lpDDSPrimary,lpClipper);
+		ddrval = IDirectDrawSurface7_SetClipper(lpDDSPrimary, lpClipper);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error attaching clipper to primary surface.");
@@ -409,7 +432,7 @@ int SetVideoMode(int fs)
 			return 0;
 		}
 
-		windowedfailed=0;
+		windowedfailed = 0;
 		SetMainWindowStuff();
 	}
 	else
@@ -417,26 +440,26 @@ int SetVideoMode(int fs)
 		int xres = 256;
 
 		//Following is full-screen
-		if(vmod == 0)	// Custom mode
+		if (vmod == 0)	// Custom mode
 		{
 			// -Video Modes Tag-
-			if(vmodes[0].special <= 3 && vmodes[0].special >= 1)
+			if (vmodes[0].special <= 3 && vmodes[0].special >= 1)
 				specmul = 2;
-			else if(vmodes[0].special >= 4 && vmodes[0].special <= 5)
+			else if (vmodes[0].special >= 4 && vmodes[0].special <= 5)
 				specmul = 3;
-			 else if(vmodes[0].special >= 6 && vmodes[0].special <= 13)
+			else if (vmodes[0].special >= 6 && vmodes[0].special <= 13)
 				specmul = vmodes[0].special - 4; // magic assuming prescales are vmodes[0].special >= 6
-			else if(vmodes[0].special == 14)
+			else if (vmodes[0].special == 14)
 				specmul = 3;
 			else
 				specmul = 1;
 
-			if(vmodes[0].special==3)
-				xres = 301;
+			if (vmodes[0].special == 3)
+				xres = NSFVideoNTSCXRes(vmodes[0].special);
 		}
 		HideFWindow(1);
 
-		ddrval = IDirectDraw7_SetCooperativeLevel ( lpDD7, hAppWnd,DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN | DDSCL_ALLOWREBOOT);
+		ddrval = IDirectDraw7_SetCooperativeLevel(lpDD7, hAppWnd, DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN | DDSCL_ALLOWREBOOT);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error setting cooperative level.");
@@ -444,29 +467,29 @@ int SetVideoMode(int fs)
 			return 0;
 		}
 
-		ddrval = IDirectDraw7_SetDisplayMode(lpDD7, vmodes[vmod].x, vmodes[vmod].y,vmodes[vmod].bpp,0,0);
+		ddrval = IDirectDraw7_SetDisplayMode(lpDD7, vmodes[vmod].x, vmodes[vmod].y, vmodes[vmod].bpp, 0, 0);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error setting display mode.");
 			FCEU_printf("Error setting display mode.\n");
 			return 0;
 		}
-		if(vmodes[vmod].flags&VMDF_DXBLT)
+		if (vmodes[vmod].flags & VMDF_DXBLT)
 		{
-			memset(&ddsdback,0,sizeof(ddsdback));
-			ddsdback.dwSize=sizeof(ddsdback);
+			memset(&ddsdback, 0, sizeof(ddsdback));
+			ddsdback.dwSize = sizeof(ddsdback);
 			ddsdback.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
-			ddsdback.ddsCaps.dwCaps= DDSCAPS_OFFSCREENPLAIN;
+			ddsdback.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
 
-			ddsdback.dwWidth=xres * specmul; //vmodes[vmod].srect.right;
-			ddsdback.dwHeight=FSettings.TotalScanlines() * ((vmodes[0].special == 14) ? 1 : specmul); //vmodes[vmod].srect.bottom;
+			ddsdback.dwWidth = xres * specmul; //vmodes[vmod].srect.right;
+			ddsdback.dwHeight = FSettings.TotalScanlines() * ((vmodes[0].special == 14) ? 1 : specmul); //vmodes[vmod].srect.bottom;
 
 			if (directDrawModeFullscreen == DIRECTDRAW_MODE_SURFACE_IN_RAM)
 				// create the buffer in system memory
-				ddsdback.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY; 
+				ddsdback.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
 
-			ddrval = IDirectDraw7_CreateSurface ( lpDD7, &ddsdback, &lpDDSBack, (IUnknown FAR*)NULL);
-			if(ddrval!=DD_OK)
+			ddrval = IDirectDraw7_CreateSurface(lpDD7, &ddsdback, &lpDDSBack, (IUnknown FAR*)NULL);
+			if (ddrval != DD_OK)
 			{
 				//ShowDDErr("Error creating secondary surface.");
 				FCEU_printf("Error creating secondary surface.\n");
@@ -479,35 +502,35 @@ int SetVideoMode(int fs)
 
 		// create foreground surface
 
-		memset(&ddsd,0,sizeof(ddsd));
+		memset(&ddsd, 0, sizeof(ddsd));
 		ddsd.dwSize = sizeof(ddsd);
 
 		ddsd.dwFlags = DDSD_CAPS;
 		ddsd.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
 
-		if(fssync==3) // Double buffering.
+		if (fssync == 3) // Double buffering.
 		{
 			ddsd.dwFlags |= DDSD_BACKBUFFERCOUNT;
 			ddsd.dwBackBufferCount = 1;
 			ddsd.ddsCaps.dwCaps |= DDSCAPS_COMPLEX | DDSCAPS_FLIP;
 		}
 
-		ddrval = IDirectDraw7_CreateSurface ( lpDD7, &ddsd, &lpDDSPrimary,(IUnknown FAR*)NULL);
+		ddrval = IDirectDraw7_CreateSurface(lpDD7, &ddsd, &lpDDSPrimary, (IUnknown FAR*)NULL);
 		if (ddrval != DD_OK)
 		{
 			//ShowDDErr("Error creating primary surface.");
 			FCEU_printf("Error creating primary surface.\n");
 			return 0;
-		} 
+		}
 
-		if(fssync==3)
+		if (fssync == 3)
 		{
 			DDSCAPS2 tmp;
 
-			memset(&tmp,0,sizeof(tmp));
-			tmp.dwCaps=DDSCAPS_BACKBUFFER;
+			memset(&tmp, 0, sizeof(tmp));
+			tmp.dwCaps = DDSCAPS_BACKBUFFER;
 
-			if(IDirectDrawSurface7_GetAttachedSurface(lpDDSPrimary,&tmp,&lpDDSDBack)!=DD_OK)
+			if (IDirectDrawSurface7_GetAttachedSurface(lpDDSPrimary, &tmp, &lpDDSDBack) != DD_OK)
 			{
 				//ShowDDErr("Error getting attached surface.");
 				FCEU_printf("Error getting attached surface.\n");
@@ -515,63 +538,63 @@ int SetVideoMode(int fs)
 			}
 		}
 
-		if(!GetBPP())
+		if (!GetBPP())
 			return 0;
-		if(!InitBPPStuff(fs))
+		if (!InitBPPStuff(fs))
 			return 0;
 
-		mustrestore=1;
+		mustrestore = 1;
 
 		if (eoptions & EO_HIDEMOUSE)
 			ShowCursorAbs(0);
 	}
 
-	fullscreen=fs;
+	fullscreen = fs;
 	return 1;
 }
 
 //draw input aids if we are fullscreen
 bool FCEUD_ShouldDrawInputAids()
 {
-	return fullscreen!=0;
+	return fullscreen != 0;
 }
 
-static void BlitScreenWindow(uint8 *XBuf);
-static void BlitScreenFull(uint8 *XBuf);
+static void BlitScreenWindow(uint8* XBuf);
+static void BlitScreenFull(uint8* XBuf);
 
 static void FCEUD_VerticalSync()
 {
-	if(!NoWaiting)
+	if (!NoWaiting)
 	{
 		int ws;
 
-		if(fullscreen) ws=fssync;
+		if (fullscreen) ws = fssync;
 		else ws = winsync;
 
-		if(ws==1)
-			IDirectDraw7_WaitForVerticalBlank(lpDD7,DDWAITVB_BLOCKBEGIN,0);
-		else if(ws == 2)   
+		if (ws == 1)
+			IDirectDraw7_WaitForVerticalBlank(lpDD7, DDWAITVB_BLOCKBEGIN, 0);
+		else if (ws == 2)
 		{
 			BOOL invb = 0;
 
-			while((DD_OK == IDirectDraw7_GetVerticalBlankStatus(lpDD7,&invb)) && !invb)
+			while ((DD_OK == IDirectDraw7_GetVerticalBlankStatus(lpDD7, &invb)) && !invb)
 				Sleep(0);
 		}
 	}
 }
 
 //static uint8 *XBSave;
-void FCEUD_BlitScreen(uint8 *XBuf)
+void FCEUD_BlitScreen(uint8* XBuf)
 {
 	xbsave = XBuf;
 
-	if(fullscreen)
+	if (fullscreen)
 	{
 		BlitScreenFull(XBuf);
 	}
 	else
 	{
-		if(!windowedfailed)
+		if (!windowedfailed)
 			BlitScreenWindow(XBuf);
 	}
 }
@@ -581,10 +604,10 @@ static void FixPaletteHi(void)
 	SetPaletteBlitToHigh((uint8*)color_palette); //mbg merge 7/17/06 added cast
 }
 
-static void BlitScreenWindow(unsigned char *XBuf)
+static void BlitScreenWindow(unsigned char* XBuf)
 {
 	int pitch;
-	unsigned char *ScreenLoc;
+	unsigned char* ScreenLoc;
 	static RECT srect, wrect, blitRect;
 	int specialmul;
 
@@ -592,33 +615,33 @@ static void BlitScreenWindow(unsigned char *XBuf)
 
 	// -Video Modes Tag-
 	int xres = 256;
-	if(winspecial <= 3 && winspecial >= 1)
+	if (winspecial <= 3 && winspecial >= 1)
 		specialmul = 2;
-	else if(winspecial >= 4 && winspecial <= 5)
+	else if (winspecial >= 4 && winspecial <= 5)
 		specialmul = 3;
-	else if(winspecial >= 6 && winspecial <= 13)
+	else if (winspecial >= 6 && winspecial <= 13)
 		specialmul = winspecial - 4; // magic assuming prescales are winspecial >= 6
-	else if(winspecial == 14)
+	else if (winspecial == 14)
 		specialmul = 3;
 	else specialmul = 1;
 
-	if(winspecial == 3)
-		xres = 301;
+	if (winspecial == 3)
+		xres = NSFVideoNTSCXRes(winspecial);
 
-	srect.top=srect.left=0;
-	srect.right=VNSWID_NU(xres) * specialmul;
-	srect.bottom=FSettings.TotalScanlines() * ((winspecial == 14) ? 1 : specialmul);
+	srect.top = srect.left = 0;
+	srect.right = VNSWID_NU(xres) * specialmul;
+	srect.bottom = FSettings.TotalScanlines() * ((winspecial == 14) ? 1 : specialmul);
 
-	if(PaletteChanged==1)
+	if (PaletteChanged == 1)
 	{
 		palupdate = 1;
 		FixPaletteHi();
-		PaletteChanged=0;
+		PaletteChanged = 0;
 	}
 
-	if(!GetClientAbsRect(&wrect)) return;
+	if (!GetClientAbsRect(&wrect)) return;
 
-	ddrval=IDirectDrawSurface7_Lock(lpDDSBack,NULL,&ddsdback, 0, NULL);
+	ddrval = IDirectDrawSurface7_Lock(lpDDSBack, NULL, &ddsdback, 0, NULL);
 	if (ddrval != DD_OK)
 	{
 		if (ddrval == DDERR_SURFACELOST)
@@ -627,17 +650,17 @@ static void BlitScreenWindow(unsigned char *XBuf)
 	}
 
 	//mbg merge 7/17/06 removing dummyunion stuff
-	pitch=ddsdback.lPitch;
-	ScreenLoc=(unsigned char*)ddsdback.lpSurface; //mbg merge 7/17/06 added cst
-	if(veflags&1)
+	pitch = ddsdback.lPitch;
+	ScreenLoc = (unsigned char*)ddsdback.lpSurface; //mbg merge 7/17/06 added cst
+	if (veflags & 1)
 	{
-		memset(ScreenLoc,0,pitch*ddsdback.dwHeight);
-		veflags&=~1;
+		memset(ScreenLoc, 0, pitch * ddsdback.dwHeight);
+		veflags &= ~1;
 	}
 	//NOT VNSWID_NU ON PURPOSE! this is where 256 gets turned to 301
 	//we'll actually blit a subrectangle later if we clipped the sides
 	//MOREOVER: we order this to scale the whole area no matter what; a subrectangle will come out later (right?)
-	Blit8ToHigh(XBuf+FSettings.FirstSLine*256+VNSCLIP,ScreenLoc, 256, FSettings.TotalScanlines(), pitch,specialmul,specialmul);
+	Blit8ToHigh(XBuf + FSettings.FirstSLine * 256 + NSFVideoClipLeft(), ScreenLoc, 256, FSettings.TotalScanlines(), pitch, specialmul, specialmul);
 
 	IDirectDrawSurface7_Unlock(lpDDSBack, NULL);
 
@@ -652,9 +675,9 @@ static void BlitScreenWindow(unsigned char *XBuf)
 		if (IDirectDrawSurface7_Blt(lpDDSPrimary, &blitRect, lpDDSBack, &srect, DDBLT_ASYNC, 0) != DD_OK)
 		{
 			ddrval = IDirectDrawSurface7_Blt(lpDDSPrimary, &blitRect, lpDDSBack, &srect, DDBLT_WAIT, 0);
-			if(ddrval != DD_OK)
+			if (ddrval != DD_OK)
 			{
-				if(ddrval == DDERR_SURFACELOST)
+				if (ddrval == DDERR_SURFACELOST)
 				{
 					RestoreDD(1);
 					RestoreDD(0);
@@ -669,7 +692,8 @@ static void BlitScreenWindow(unsigned char *XBuf)
 			unsigned char r, g, b;
 			FCEUD_GetPalette(0x80 | PALRAM[0], &r, &g, &b);
 			blitfx.dwFillColor = (r << 16) + (g << 8) + b;
-		} else
+		}
+		else
 		{
 			blitfx.dwFillColor = 0;
 		}
@@ -699,15 +723,16 @@ static void BlitScreenWindow(unsigned char *XBuf)
 			blitRect.right = wrect.right;
 			IDirectDrawSurface7_Blt(lpDDSPrimary, &blitRect, NULL, NULL, DDBLT_COLORFILL | DDBLT_ASYNC, &blitfx);
 		}
-	} else
+	}
+	else
 	{
 		// blit without resizing
-		if(IDirectDrawSurface7_Blt(lpDDSPrimary, &wrect, lpDDSBack, &srect, DDBLT_ASYNC, 0) != DD_OK)
+		if (IDirectDrawSurface7_Blt(lpDDSPrimary, &wrect, lpDDSBack, &srect, DDBLT_ASYNC, 0) != DD_OK)
 		{
 			ddrval = IDirectDrawSurface7_Blt(lpDDSPrimary, &wrect, lpDDSBack, &srect, DDBLT_WAIT, 0);
-			if(ddrval != DD_OK)
+			if (ddrval != DD_OK)
 			{
-				if(ddrval == DDERR_SURFACELOST)
+				if (ddrval == DDERR_SURFACELOST)
 				{
 					RestoreDD(1);
 					RestoreDD(0);
@@ -721,20 +746,20 @@ static void BlitScreenWindow(unsigned char *XBuf)
 static void DD_FillRect(LPDIRECTDRAWSURFACE7 surf, int left, int top, int right, int bottom, DWORD color)
 {
 	RECT r;
-	SetRect(&r,left,top,right,bottom);
+	SetRect(&r, left, top, right, bottom);
 	DDBLTFX fx;
-	memset(&fx,0,sizeof(DDBLTFX));
+	memset(&fx, 0, sizeof(DDBLTFX));
 	fx.dwSize = sizeof(DDBLTFX);
 	//fx.dwFillColor = color;
 	fx.dwFillColor = 0; //color is just for debug
-	surf->Blt(&r,NULL,NULL,DDBLT_COLORFILL | DDBLT_WAIT,&fx);
+	surf->Blt(&r, NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &fx);
 }
 
 
-static void BlitScreenFull(uint8 *XBuf)
+static void BlitScreenFull(uint8* XBuf)
 {
 	static int pitch;
-	char *ScreenLoc;
+	char* ScreenLoc;
 	//unsigned long x; //mbg merge 7/17/06 removed
 	//uint8 y; //mbg merge 7/17/06 removed
 	RECT srect, drect;
@@ -742,67 +767,67 @@ static void BlitScreenFull(uint8 *XBuf)
 	int xres = 256;
 	int specmul;    // Special scaler size multiplier
 	// -Video Modes Tag-
-	if(vmodes[0].special <= 3 && vmodes[0].special >= 1)
+	if (vmodes[0].special <= 3 && vmodes[0].special >= 1)
 		specmul = 2;
-	else if(vmodes[0].special >= 4 && vmodes[0].special <= 5)
+	else if (vmodes[0].special >= 4 && vmodes[0].special <= 5)
 		specmul = 3;
-	else if(vmodes[0].special >= 6 && vmodes[0].special <= 13)
+	else if (vmodes[0].special >= 6 && vmodes[0].special <= 13)
 		specmul = vmodes[0].special - 4; // magic assuming prescales are vmodes[0].special >= 6
-	else if(vmodes[0].special == 14)
+	else if (vmodes[0].special == 14)
 		specmul = 3;
 	else
 		specmul = 1;
 
-	if(vmodes[0].special == 3)
-		xres = 301;
+	if (vmodes[0].special == 3)
+		xres = NSFVideoNTSCXRes(vmodes[0].special);
 
-	if(fssync==3)
-		lpDDSVPrimary=lpDDSDBack;
+	if (fssync == 3)
+		lpDDSVPrimary = lpDDSDBack;
 	else
-		lpDDSVPrimary=lpDDSPrimary;
+		lpDDSVPrimary = lpDDSPrimary;
 
 	if (!lpDDSVPrimary) return;
 
-	if(PaletteChanged==1)
+	if (PaletteChanged == 1)
 	{
 		palupdate = 1;
-		if(bpp>=16)
+		if (bpp >= 16)
 			FixPaletteHi();
 		else
 		{
-			ddrval=IDirectDrawPalette_SetEntries(lpddpal,0,0,256,color_palette);
-			if(ddrval!=DD_OK)
+			ddrval = IDirectDrawPalette_SetEntries(lpddpal, 0, 0, 256, color_palette);
+			if (ddrval != DD_OK)
 			{
-				if(ddrval==DDERR_SURFACELOST) RestoreDD(0);
+				if (ddrval == DDERR_SURFACELOST) RestoreDD(0);
 				return;
-			}   
+			}
 		}
-		PaletteChanged=0;
+		PaletteChanged = 0;
 	}
 
-	if(vmodes[vmod].flags&VMDF_DXBLT)
+	if (vmodes[vmod].flags & VMDF_DXBLT)
 	{
 		// start rendering into backbuffer
- 		ddrval=IDirectDrawSurface7_Lock(lpDDSBack,NULL,&ddsdback, 0, NULL);
-		if(ddrval!=DD_OK)
+		ddrval = IDirectDrawSurface7_Lock(lpDDSBack, NULL, &ddsdback, 0, NULL);
+		if (ddrval != DD_OK)
 		{
-			if(ddrval==DDERR_SURFACELOST) RestoreDD(1);
+			if (ddrval == DDERR_SURFACELOST) RestoreDD(1);
 			return;
 		}
-		ScreenLoc=(char *)ddsdback.lpSurface; //mbg merge 7/17/06 added cast
-		pitch=ddsdback.lPitch; //mbg merge 7/17/06 removed dummyunion stuff
+		ScreenLoc = (char*)ddsdback.lpSurface; //mbg merge 7/17/06 added cast
+		pitch = ddsdback.lPitch; //mbg merge 7/17/06 removed dummyunion stuff
 
-		srect.top=0;
-		srect.left=0;
-		srect.right=VNSWID_NU(xres) * specmul;
-		srect.bottom=FSettings.TotalScanlines() * ((vmodes[0].special == 14) ? 1 : specmul);
+		srect.top = 0;
+		srect.left = 0;
+		srect.right = VNSWID_NU(xres) * specmul;
+		srect.bottom = FSettings.TotalScanlines() * ((vmodes[0].special == 14) ? 1 : specmul);
 
 		//if(vmodes[vmod].flags&VMDF_STRFS)
 		//{
-			drect.top=0;
-			drect.left=0;
-			drect.right=vmodes[vmod].x;
-			drect.bottom=vmodes[vmod].y;
+		drect.top = 0;
+		drect.left = 0;
+		drect.right = vmodes[vmod].x;
+		drect.bottom = vmodes[vmod].y;
 		/*
 		}
 		else
@@ -831,67 +856,68 @@ static void BlitScreenFull(uint8 *XBuf)
 			DD_FillRect(lpDDSVPrimary,right,bottom,fullScreen.right,fullScreen.bottom,RGB(0,255,255)); //bottomright
 		}
 		*/
-	} else
+	}
+	else
 	{
 		// start rendering directly to screen
 		FCEUD_VerticalSync();
-		ddrval=IDirectDrawSurface7_Lock(lpDDSVPrimary,NULL,&ddsd, 0, NULL);
-		if(ddrval!=DD_OK)
+		ddrval = IDirectDrawSurface7_Lock(lpDDSVPrimary, NULL, &ddsd, 0, NULL);
+		if (ddrval != DD_OK)
 		{
-			if(ddrval==DDERR_SURFACELOST) RestoreDD(0);
+			if (ddrval == DDERR_SURFACELOST) RestoreDD(0);
 			return;
 		}
 
-		ScreenLoc=(char*)ddsd.lpSurface; //mbg merge 7/17/06 added cast
-		pitch=ddsd.lPitch; //mbg merge 7/17/06 removing dummyunion stuff
+		ScreenLoc = (char*)ddsd.lpSurface; //mbg merge 7/17/06 added cast
+		pitch = ddsd.lPitch; //mbg merge 7/17/06 removing dummyunion stuff
 	}
 
-	if(veflags&1)
+	if (veflags & 1)
 	{
-		if(vmodes[vmod].flags&VMDF_DXBLT)
+		if (vmodes[vmod].flags & VMDF_DXBLT)
 		{
-			veflags|=2;
-			memset((char *)ScreenLoc,0,pitch*srect.bottom);
+			veflags |= 2;
+			memset((char*)ScreenLoc, 0, pitch * srect.bottom);
 		}
 		else
 		{
-			memset((char *)ScreenLoc,0,pitch*vmodes[vmod].y);
+			memset((char*)ScreenLoc, 0, pitch * vmodes[vmod].y);
 		}
-		PaletteChanged=1;
-		veflags&=~1;
+		PaletteChanged = 1;
+		veflags &= ~1;
 	}
 
 	//mbg 6/29/06 merge
 	{
-		if(!(vmodes[vmod].flags&VMDF_DXBLT))
-		{  
+		if (!(vmodes[vmod].flags & VMDF_DXBLT))
+		{
 			// -Video Modes Tag-
-			if(vmodes[vmod].special)
-				ScreenLoc += (vmodes[vmod].drect.left*(bpp>>3)) + ((vmodes[vmod].drect.top)*pitch);   
+			if (vmodes[vmod].special)
+				ScreenLoc += (vmodes[vmod].drect.left * (bpp >> 3)) + ((vmodes[vmod].drect.top) * pitch);
 			else
-				ScreenLoc+=((vmodes[vmod].x-VNSWID_NU(xres))>>1)*(bpp>>3)+(((vmodes[vmod].y-FSettings.TotalScanlines())>>1))*pitch;
+				ScreenLoc += ((vmodes[vmod].x - VNSWID_NU(xres)) >> 1) * (bpp >> 3) + (((vmodes[vmod].y - FSettings.TotalScanlines()) >> 1)) * pitch;
 		}
 
-		if(bpp>=16)
+		if (bpp >= 16)
 		{
 			//NOT VNSWID_NU ON PURPOSE! this is where 256 gets turned to 301
 			//we'll actually blit a subrectangle later if we clipped the sides
 			//MOREOVER: we order this to scale the whole area no matter what; a subrectangle will come out later (right?)
-			Blit8ToHigh(XBuf+FSettings.FirstSLine*256+VNSCLIP,(uint8*)ScreenLoc, 256, FSettings.TotalScanlines(), pitch,specmul,specmul); //mbg merge 7/17/06 added cast
+			Blit8ToHigh(XBuf + FSettings.FirstSLine * 256 + NSFVideoClipLeft(), (uint8*)ScreenLoc, 256, FSettings.TotalScanlines(), pitch, specmul, specmul); //mbg merge 7/17/06 added cast
 		}
 		else
 		{
-			XBuf+=FSettings.FirstSLine*256+VNSCLIP;
+			XBuf += FSettings.FirstSLine * 256 + NSFVideoClipLeft();
 			// -Video Modes Tag-
-			if(vmodes[vmod].special)
-				Blit8To8(XBuf,(uint8*)ScreenLoc, VNSWID_NU(xres), FSettings.TotalScanlines(), pitch,vmodes[vmod].xscale,vmodes[vmod].yscale,0,vmodes[vmod].special); //mbg merge 7/17/06 added cast
+			if (vmodes[vmod].special)
+				Blit8To8(XBuf, (uint8*)ScreenLoc, VNSWID_NU(xres), FSettings.TotalScanlines(), pitch, vmodes[vmod].xscale, vmodes[vmod].yscale, 0, vmodes[vmod].special); //mbg merge 7/17/06 added cast
 			else
-				Blit8To8(XBuf,(uint8*)ScreenLoc, VNSWID_NU(xres), FSettings.TotalScanlines(), pitch,1,1,0,0); //mbg merge 7/17/06 added cast
+				Blit8To8(XBuf, (uint8*)ScreenLoc, VNSWID_NU(xres), FSettings.TotalScanlines(), pitch, 1, 1, 0, 0); //mbg merge 7/17/06 added cast
 		}
 	}
 
-	if(vmodes[vmod].flags&VMDF_DXBLT)
-	{ 
+	if (vmodes[vmod].flags & VMDF_DXBLT)
+	{
 		IDirectDrawSurface7_Unlock(lpDDSBack, NULL);
 		FCEUD_VerticalSync();
 		if (eoptions & EO_BESTFIT && (bestfitRect.top || bestfitRect.left) && !vmod)
@@ -900,9 +926,9 @@ static void BlitScreenFull(uint8 *XBuf)
 			if (IDirectDrawSurface7_Blt(lpDDSVPrimary, &bestfitRect, lpDDSBack, &srect, DDBLT_ASYNC, 0) != DD_OK)
 			{
 				ddrval = IDirectDrawSurface7_Blt(lpDDSVPrimary, &bestfitRect, lpDDSBack, &srect, DDBLT_WAIT, 0);
-				if(ddrval != DD_OK)
+				if (ddrval != DD_OK)
 				{
-					if(ddrval == DDERR_SURFACELOST)
+					if (ddrval == DDERR_SURFACELOST)
 					{
 						RestoreDD(1);
 						RestoreDD(0);
@@ -917,7 +943,8 @@ static void BlitScreenFull(uint8 *XBuf)
 				unsigned char r, g, b;
 				FCEUD_GetPalette(0x80 | PALRAM[0], &r, &g, &b);
 				blitfx.dwFillColor = (r << 16) + (g << 8) + b;
-			} else
+			}
+			else
 			{
 				blitfx.dwFillColor = 0;
 			}
@@ -948,7 +975,8 @@ static void BlitScreenFull(uint8 *XBuf)
 				borderRect.right = drect.right;
 				IDirectDrawSurface7_Blt(lpDDSPrimary, &borderRect, NULL, NULL, DDBLT_COLORFILL | DDBLT_ASYNC, &blitfx);
 			}
-		} else
+		}
+		else
 		{
 			/*
 			if(veflags&2)
@@ -963,12 +991,12 @@ static void BlitScreenFull(uint8 *XBuf)
 			}
 			*/
 			// blit without resizing
-			if(IDirectDrawSurface7_Blt(lpDDSVPrimary, NULL, lpDDSBack, &srect, DDBLT_ASYNC,0)!=DD_OK)
+			if (IDirectDrawSurface7_Blt(lpDDSVPrimary, NULL, lpDDSBack, &srect, DDBLT_ASYNC, 0) != DD_OK)
 			{
-				ddrval=IDirectDrawSurface7_Blt(lpDDSVPrimary, NULL, lpDDSBack, &srect, DDBLT_WAIT,0);
-				if(ddrval!=DD_OK)
+				ddrval = IDirectDrawSurface7_Blt(lpDDSVPrimary, NULL, lpDDSBack, &srect, DDBLT_WAIT, 0);
+				if (ddrval != DD_OK)
 				{
-					if(ddrval==DDERR_SURFACELOST)
+					if (ddrval == DDERR_SURFACELOST)
 					{
 						RestoreDD(1);
 						RestoreDD(0);
@@ -977,14 +1005,15 @@ static void BlitScreenFull(uint8 *XBuf)
 				}
 			}
 		}
-	} else
+	}
+	else
 	{
 		IDirectDrawSurface7_Unlock(lpDDSVPrimary, NULL);
 	}
 
-	if(fssync==3)
+	if (fssync == 3)
 	{
-		IDirectDrawSurface7_Flip(lpDDSPrimary,0,0);
+		IDirectDrawSurface7_Flip(lpDDSPrimary, 0, 0);
 	}
 }
 
@@ -992,11 +1021,11 @@ void ResetVideo(void)
 {
 	ShowCursorAbs(1);
 	KillBlitToHigh();
-	if(lpDD7)
-		if(mustrestore)
+	if (lpDD7)
+		if (mustrestore)
 		{
 			IDirectDraw7_RestoreDisplayMode(lpDD7);
-			mustrestore=0;
+			mustrestore = 0;
 		}
 
 	RELEASE(lpddpal);
@@ -1006,7 +1035,7 @@ void ResetVideo(void)
 	RELEASE(lpDD7);
 }
 
-int specialmlut[5] = {1,2,2,3,3};
+int specialmlut[5] = { 1,2,2,3,3 };
 
 void ResetCustomMode()
 {
@@ -1014,7 +1043,7 @@ void ResetCustomMode()
 	if (!lpDD7)
 		return;
 
-	vmdef *cmode = &vmodes[0];
+	vmdef* cmode = &vmodes[0];
 
 	DDSURFACEDESC2 temp_ddsd;
 	temp_ddsd.dwSize = sizeof(DDSURFACEDESC2);
@@ -1025,12 +1054,12 @@ void ResetCustomMode()
 	cmode->y = temp_ddsd.dwHeight;
 	cmode->bpp = temp_ddsd.ddpfPixelFormat.dwRGBBitCount;
 	cmode->xscale = cmode->yscale = 1;
-	cmode->flags = VMDF_DXBLT|VMDF_STRFS;
+	cmode->flags = VMDF_DXBLT | VMDF_STRFS;
 }
 
 static int RecalcCustom(void)
 {
-	vmdef *cmode = &vmodes[0];
+	vmdef* cmode = &vmodes[0];
 
 	//don't see how ntsc could make it through here
 	int xres = 256;
@@ -1038,31 +1067,32 @@ static int RecalcCustom(void)
 	if ((cmode->x <= 0) || (cmode->y <= 0))
 		ResetCustomMode();
 
-	if(cmode->flags&VMDF_STRFS)
+	if (cmode->flags & VMDF_STRFS)
 	{
 		cmode->flags |= VMDF_DXBLT;
-	} else if(cmode->xscale!=1 || cmode->yscale!=1 || cmode->special) 
+	}
+	else if (cmode->xscale != 1 || cmode->yscale != 1 || cmode->special)
 	{
 		cmode->flags &= ~VMDF_DXBLT;
-		if(cmode->special)
+		if (cmode->special)
 		{
 			int mult = specialmlut[cmode->special];
 
-			if(cmode->xscale < mult)
+			if (cmode->xscale < mult)
 				cmode->xscale = mult;
-			if(cmode->yscale < mult)
+			if (cmode->yscale < mult)
 				cmode->yscale = mult;
 
-			if(cmode->xscale != mult || cmode->yscale != mult)
-				cmode->flags|=VMDF_DXBLT;
+			if (cmode->xscale != mult || cmode->yscale != mult)
+				cmode->flags |= VMDF_DXBLT;
 		}
 		else
-			cmode->flags|=VMDF_DXBLT;
+			cmode->flags |= VMDF_DXBLT;
 
 
-		if(VNSWID_NU(xres)*cmode->xscale>cmode->x)
+		if (VNSWID_NU(xres) * cmode->xscale > cmode->x)
 		{
-			if(cmode->special)
+			if (cmode->special)
 			{
 				FCEUD_PrintError("Scaled width is out of range.");
 				return(0);
@@ -1070,12 +1100,12 @@ static int RecalcCustom(void)
 			else
 			{
 				FCEUD_PrintError("Scaled width is out of range.  Reverting to no horizontal scaling.");
-				cmode->xscale=1;
+				cmode->xscale = 1;
 			}
 		}
-		if(FSettings.TotalScanlines()*cmode->yscale>cmode->y)
+		if (FSettings.TotalScanlines() * cmode->yscale > cmode->y)
 		{
-			if(cmode->special)
+			if (cmode->special)
 			{
 				FCEUD_PrintError("Scaled height is out of range.");
 				return(0);
@@ -1083,36 +1113,36 @@ static int RecalcCustom(void)
 			else
 			{
 				FCEUD_PrintError("Scaled height is out of range.  Reverting to no vertical scaling.");
-				cmode->yscale=1;
+				cmode->yscale = 1;
 			}
 		}
 
-		cmode->srect.left=VNSCLIP;
-		cmode->srect.top=FSettings.FirstSLine;
-		cmode->srect.right=256-VNSCLIP;
-		cmode->srect.bottom=FSettings.LastSLine+1;
+		cmode->srect.left = NSFVideoClipLeft();
+		cmode->srect.top = FSettings.FirstSLine;
+		cmode->srect.right = NSFVideoClipRight();
+		cmode->srect.bottom = FSettings.LastSLine + 1;
 
-		cmode->drect.top=(cmode->y-(FSettings.TotalScanlines()*cmode->yscale))>>1;
-		cmode->drect.bottom=cmode->drect.top+FSettings.TotalScanlines()*cmode->yscale;
+		cmode->drect.top = (cmode->y - (FSettings.TotalScanlines() * cmode->yscale)) >> 1;
+		cmode->drect.bottom = cmode->drect.top + FSettings.TotalScanlines() * cmode->yscale;
 
-		cmode->drect.left=(cmode->x-(VNSWID_NU(xres)*cmode->xscale))>>1;
-		cmode->drect.right=cmode->drect.left+VNSWID_NU(xres)*cmode->xscale;
+		cmode->drect.left = (cmode->x - (VNSWID_NU(xres) * cmode->xscale)) >> 1;
+		cmode->drect.right = cmode->drect.left + VNSWID_NU(xres) * cmode->xscale;
 	}
 
 	// -Video Modes Tag-
-	if((cmode->special == 1 || cmode->special == 4) && cmode->bpp == 8)
+	if ((cmode->special == 1 || cmode->special == 4) && cmode->bpp == 8)
 	{
 		cmode->bpp = 32;
 		//FCEUD_PrintError("HQ2x/HQ3x requires 16bpp or 32bpp(best).");
 		//return(0);
 	}
 
-	if(cmode->x<VNSWID_NU(xres))
+	if (cmode->x < VNSWID_NU(xres))
 	{
 		FCEUD_PrintError("Horizontal resolution is too low.");
 		return(0);
 	}
-	if(cmode->y<FSettings.TotalScanlines() && !(cmode->flags&VMDF_STRFS))
+	if (cmode->y < FSettings.TotalScanlines() && !(cmode->flags & VMDF_STRFS))
 	{
 		FCEUD_PrintError("Vertical resolution must not be less than the total number of drawn scanlines.");
 		return(0);
@@ -1124,7 +1154,7 @@ static int RecalcCustom(void)
 BOOL SetDlgItemDouble(HWND hDlg, int item, double value)
 {
 	char buf[16];
-	sprintf(buf,"%.6f",value);
+	sprintf(buf, "%.6f", value);
 	return SetDlgItemText(hDlg, item, buf);
 }
 
@@ -1134,13 +1164,13 @@ double GetDlgItemDouble(HWND hDlg, int item)
 	double ret = 0;
 
 	GetDlgItemText(hDlg, item, buf, 15);
-	sscanf(buf,"%lf",&ret);
+	sscanf(buf, "%lf", &ret);
 	return(ret);
 }
 
 INT_PTR CALLBACK VideoConCallB(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	static char *vmstr[11]={
+	static char* vmstr[11] = {
 		"Custom",
 		"320x240 Full Screen",
 		"512x384 Centered",
@@ -1155,7 +1185,7 @@ INT_PTR CALLBACK VideoConCallB(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 	};
 	//int x;
 
-	switch(uMsg)
+	switch (uMsg)
 	{
 	case WM_INITDIALOG:
 	{
@@ -1165,26 +1195,26 @@ INT_PTR CALLBACK VideoConCallB(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_MODE,CB_SETCURSEL,vmod,(LPARAM)(LPSTR)0);
 		*/
 
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_BPP,CB_ADDSTRING,0,(LPARAM)(LPSTR)"8");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_BPP,CB_ADDSTRING,0,(LPARAM)(LPSTR)"16");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_BPP,CB_ADDSTRING,0,(LPARAM)(LPSTR)"24");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_BPP,CB_ADDSTRING,0,(LPARAM)(LPSTR)"32");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_BPP,CB_SETCURSEL,(vmodes[0].bpp>>3)-1,(LPARAM)(LPSTR)0);
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_BPP, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"8");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_BPP, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"16");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_BPP, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"24");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_BPP, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"32");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_BPP, CB_SETCURSEL, (vmodes[0].bpp >> 3) - 1, (LPARAM)(LPSTR)0);
 
-		SetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_XRES,vmodes[0].x,0);
-		SetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_YRES,vmodes[0].y,0);
+		SetDlgItemInt(hwndDlg, IDC_VIDEOCONFIG_XRES, vmodes[0].x, 0);
+		SetDlgItemInt(hwndDlg, IDC_VIDEOCONFIG_YRES, vmodes[0].y, 0);
 
 		//SetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_XSCALE,vmodes[0].xscale,0);
 		//SetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_YSCALE,vmodes[0].yscale,0);
 		//CheckRadioButton(hwndDlg,IDC_RADIO_SCALE,IDC_RADIO_STRETCH,(vmodes[0].flags&VMDF_STRFS)?IDC_RADIO_STRETCH:IDC_RADIO_SCALE);
 
 		// -Video Modes Tag-
-		char *str[]={"<none>","HQ 2x","Scale 2x","NTSC 2x","HQ 3x","Scale 3x","Prescale 2x","Prescale 3x","Prescale 4x","Prescale 5x","Prescale 6x","Prescale 7x","Prescale 8x","Prescale 9x","PAL 3x"};
+		char* str[] = { "<none>","HQ 2x","Scale 2x","NTSC 2x","HQ 3x","Scale 3x","Prescale 2x","Prescale 3x","Prescale 4x","Prescale 5x","Prescale 6x","Prescale 7x","Prescale 8x","Prescale 9x","PAL 3x" };
 		int x;
-		for(x=0;x<15;x++)
+		for (x = 0; x < 15; x++)
 		{
-			SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SCALER_FS,CB_ADDSTRING,0,(LPARAM)(LPSTR)str[x]);
-			SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SCALER_WIN,CB_ADDSTRING,0,(LPARAM)(LPSTR)str[x]);
+			SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SCALER_FS, CB_ADDSTRING, 0, (LPARAM)(LPSTR)str[x]);
+			SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SCALER_WIN, CB_ADDSTRING, 0, (LPARAM)(LPSTR)str[x]);
 		}
 
 		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SCALER_FS, CB_SETCURSEL, vmodes[0].special, (LPARAM)(LPSTR)0);
@@ -1203,38 +1233,38 @@ INT_PTR CALLBACK VideoConCallB(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 
 		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_DIRECTDRAW_FS, CB_SETCURSEL, directDrawModeFullscreen, (LPARAM)(LPSTR)0);
 
-		if(eoptions&EO_FSAFTERLOAD)
-			CheckDlgButton(hwndDlg,IDC_VIDEOCONFIG_AUTO_FS,BST_CHECKED);
+		if (eoptions & EO_FSAFTERLOAD)
+			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_AUTO_FS, BST_CHECKED);
 
-		if(eoptions&EO_HIDEMOUSE)
-			CheckDlgButton(hwndDlg,IDC_VIDEOCONFIG_HIDEMOUSE,BST_CHECKED);
+		if (eoptions & EO_HIDEMOUSE)
+			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_HIDEMOUSE, BST_CHECKED);
 
-		if(eoptions&EO_CLIPSIDES)
-			CheckDlgButton(hwndDlg,IDC_VIDEOCONFIG_CLIPSIDES,BST_CHECKED);
+		if (eoptions & EO_CLIPSIDES)
+			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_CLIPSIDES, BST_CHECKED);
 
-		if(eoptions&EO_BESTFIT)
+		if (eoptions & EO_BESTFIT)
 			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_BESTFIT, BST_CHECKED);
 
-		if(eoptions&EO_BGCOLOR)
-			CheckDlgButton(hwndDlg,IDC_VIDEOCONFIG_CONSOLE_BGCOLOR,BST_CHECKED);
+		if (eoptions & EO_BGCOLOR)
+			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_CONSOLE_BGCOLOR, BST_CHECKED);
 
-		if(eoptions&EO_SQUAREPIXELS)
+		if (eoptions & EO_SQUAREPIXELS)
 			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_SQUARE_PIXELS, BST_CHECKED);
 
-		if(eoptions&EO_TVASPECT)
+		if (eoptions & EO_TVASPECT)
 			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_TVASPECT, BST_CHECKED);
 
-		if(eoptions&EO_FORCEISCALE)
-			CheckDlgButton(hwndDlg,IDC_FORCE_INT_VIDEO_SCALARS,BST_CHECKED);
+		if (eoptions & EO_FORCEISCALE)
+			CheckDlgButton(hwndDlg, IDC_FORCE_INT_VIDEO_SCALARS, BST_CHECKED);
 
-		if(eoptions&EO_FORCEASPECT)
-			CheckDlgButton(hwndDlg,IDC_FORCE_ASPECT_CORRECTION,BST_CHECKED);
+		if (eoptions & EO_FORCEASPECT)
+			CheckDlgButton(hwndDlg, IDC_FORCE_ASPECT_CORRECTION, BST_CHECKED);
 
-		SetDlgItemInt(hwndDlg,IDC_SCANLINE_FIRST_NTSC,srendlinen,0);
-		SetDlgItemInt(hwndDlg,IDC_SCANLINE_LAST_NTSC,erendlinen,0);
+		SetDlgItemInt(hwndDlg, IDC_SCANLINE_FIRST_NTSC, srendlinen, 0);
+		SetDlgItemInt(hwndDlg, IDC_SCANLINE_LAST_NTSC, erendlinen, 0);
 
-		SetDlgItemInt(hwndDlg,IDC_SCANLINE_FIRST_PAL,srendlinep,0);
-		SetDlgItemInt(hwndDlg,IDC_SCANLINE_LAST_PAL,erendlinep,0);
+		SetDlgItemInt(hwndDlg, IDC_SCANLINE_FIRST_PAL, srendlinep, 0);
+		SetDlgItemInt(hwndDlg, IDC_SCANLINE_LAST_PAL, erendlinep, 0);
 
 
 		SetDlgItemDouble(hwndDlg, IDC_WINSIZE_MUL_X, winsizemulx);
@@ -1242,45 +1272,46 @@ INT_PTR CALLBACK VideoConCallB(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 		SetDlgItemDouble(hwndDlg, IDC_TVASPECT_X, tvAspectX);
 		SetDlgItemDouble(hwndDlg, IDC_TVASPECT_Y, tvAspectY);
 
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_WIN,CB_ADDSTRING,0,(LPARAM)(LPSTR)"<none>");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_FS,CB_ADDSTRING,0,(LPARAM)(LPSTR)"<none>");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_WIN, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"<none>");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_FS, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"<none>");
 
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_WIN,CB_ADDSTRING,0,(LPARAM)(LPSTR)"Wait for VBlank");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_WIN,CB_ADDSTRING,0,(LPARAM)(LPSTR)"Lazy wait for VBlank");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_WIN, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"Wait for VBlank");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_WIN, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"Lazy wait for VBlank");
 
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_FS,CB_ADDSTRING,0,(LPARAM)(LPSTR)"Wait for VBlank");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_FS,CB_ADDSTRING,0,(LPARAM)(LPSTR)"Lazy wait for VBlank");
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_FS,CB_ADDSTRING,0,(LPARAM)(LPSTR)"Double Buffering");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_FS, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"Wait for VBlank");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_FS, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"Lazy wait for VBlank");
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_FS, CB_ADDSTRING, 0, (LPARAM)(LPSTR)"Double Buffering");
 
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_WIN,CB_SETCURSEL,winsync,(LPARAM)(LPSTR)0);
-		SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_FS,CB_SETCURSEL,fssync,(LPARAM)(LPSTR)0);
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_WIN, CB_SETCURSEL, winsync, (LPARAM)(LPSTR)0);
+		SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_FS, CB_SETCURSEL, fssync, (LPARAM)(LPSTR)0);
 
-		if(eoptions&EO_NOSPRLIM)
-			CheckDlgButton(hwndDlg,IDC_VIDEOCONFIG_NO8LIM,BST_CHECKED);
+		if (eoptions & EO_NOSPRLIM)
+			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_NO8LIM, BST_CHECKED);
 
-		if(FCEUPPU_MaskEnabled)
-			CheckDlgButton(hwndDlg,IDC_VIDEOCONFIG_PPUMASK,BST_CHECKED);
+		if (FCEUPPU_MaskEnabled)
+			CheckDlgButton(hwndDlg, IDC_VIDEOCONFIG_PPUMASK, BST_CHECKED);
 
 		char buf[1024] = "Full Screen";
 		if (FCEUD_CommandMapping[EMUCMD_MISC_TOGGLEFULLSCREEN].NumC)
 		{
 			strcat(buf, " (");
-			char *buttName = MakeButtString(&FCEUD_CommandMapping[EMUCMD_MISC_TOGGLEFULLSCREEN], 0);
+			char* buttName = MakeButtString(&FCEUD_CommandMapping[EMUCMD_MISC_TOGGLEFULLSCREEN], 0);
 			strcat(buf, buttName);
 			free(buttName);
 			if (fullscreenByDoubleclick)
 				strcat(buf, " or double-click)");
 			else
 				strcat(buf, ")");
-		} else if (fullscreenByDoubleclick)
+		}
+		else if (fullscreenByDoubleclick)
 		{
 			strcat(buf, " (double-click anywhere)");
 		}
 		SetDlgItemText(hwndDlg, IDC_VIDEOCONFIG_FS, buf);
 
-		EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_X), eoptions&EO_TVASPECT);
-		EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_Y), eoptions&EO_TVASPECT);
-		EnableWindow(GetDlgItem(hwndDlg, IDC_STATIC_SLASHTEXT), eoptions&EO_TVASPECT);
+		EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_X), eoptions & EO_TVASPECT);
+		EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_Y), eoptions & EO_TVASPECT);
+		EnableWindow(GetDlgItem(hwndDlg, IDC_STATIC_SLASHTEXT), eoptions & EO_TVASPECT);
 
 		DefaultEditCtrlProc = (WNDPROC)SetWindowLongPtr(GetDlgItem(hwndDlg, IDC_WINSIZE_MUL_X), GWLP_WNDPROC, (LONG_PTR)FilterEditCtrlProc);
 		SetWindowLongPtr(GetDlgItem(hwndDlg, IDC_WINSIZE_MUL_Y), GWLP_WNDPROC, (LONG_PTR)FilterEditCtrlProc);
@@ -1292,20 +1323,20 @@ INT_PTR CALLBACK VideoConCallB(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 	case WM_CLOSE:
 	case WM_QUIT: goto gornk;
 	case WM_COMMAND:
-		if(!(wParam>>16))
-			switch(wParam&0xFFFF)
-		{
+		if (!(wParam >> 16))
+			switch (wParam & 0xFFFF)
+			{
 			case ID_CANCEL:
-gornk:
+			gornk:
 
-				if(IsDlgButtonChecked(hwndDlg,IDC_VIDEOCONFIG_CLIPSIDES)==BST_CHECKED)
+				if (IsDlgButtonChecked(hwndDlg, IDC_VIDEOCONFIG_CLIPSIDES) == BST_CHECKED)
 				{
-					eoptions|=EO_CLIPSIDES;
+					eoptions |= EO_CLIPSIDES;
 					ClipSidesOffset = 8;
 				}
 				else
 				{
-					eoptions&=~EO_CLIPSIDES;
+					eoptions &= ~EO_CLIPSIDES;
 					ClipSidesOffset = 0;
 				}
 
@@ -1329,24 +1360,24 @@ gornk:
 				else
 					eoptions &= ~EO_TVASPECT;
 
-				if(IsDlgButtonChecked(hwndDlg,IDC_VIDEOCONFIG_NO8LIM)==BST_CHECKED)
-					eoptions|=EO_NOSPRLIM;
+				if (IsDlgButtonChecked(hwndDlg, IDC_VIDEOCONFIG_NO8LIM) == BST_CHECKED)
+					eoptions |= EO_NOSPRLIM;
 				else
-					eoptions&=~EO_NOSPRLIM;
+					eoptions &= ~EO_NOSPRLIM;
 
-				FCEUPPU_MaskEnabled = (IsDlgButtonChecked(hwndDlg,IDC_VIDEOCONFIG_PPUMASK)==BST_CHECKED) ? 1 : 0;
+				FCEUPPU_MaskEnabled = (IsDlgButtonChecked(hwndDlg, IDC_VIDEOCONFIG_PPUMASK) == BST_CHECKED) ? 1 : 0;
 
-				srendlinen=GetDlgItemInt(hwndDlg,IDC_SCANLINE_FIRST_NTSC,0,0);
-				erendlinen=GetDlgItemInt(hwndDlg,IDC_SCANLINE_LAST_NTSC,0,0);
-				srendlinep=GetDlgItemInt(hwndDlg,IDC_SCANLINE_FIRST_PAL,0,0);
-				erendlinep=GetDlgItemInt(hwndDlg,IDC_SCANLINE_LAST_PAL,0,0);
+				srendlinen = GetDlgItemInt(hwndDlg, IDC_SCANLINE_FIRST_NTSC, 0, 0);
+				erendlinen = GetDlgItemInt(hwndDlg, IDC_SCANLINE_LAST_NTSC, 0, 0);
+				srendlinep = GetDlgItemInt(hwndDlg, IDC_SCANLINE_FIRST_PAL, 0, 0);
+				erendlinep = GetDlgItemInt(hwndDlg, IDC_SCANLINE_LAST_PAL, 0, 0);
 
 
-				if(erendlinen>239) erendlinen=239;
-				if(srendlinen>erendlinen) srendlinen=erendlinen;
+				if (erendlinen > 239) erendlinen = 239;
+				if (srendlinen > erendlinen) srendlinen = erendlinen;
 
-				if(erendlinep>239) erendlinep=239;
-				if(srendlinep>erendlinen) srendlinep=erendlinep;
+				if (erendlinep > 239) erendlinep = 239;
+				if (srendlinep > erendlinen) srendlinep = erendlinep;
 
 				UpdateRendBounds();
 
@@ -1357,38 +1388,38 @@ gornk:
 					vmodes[0].flags &= ~(VMDF_STRFS|VMDF_DXBLT);
 				vmod=SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_MODE,CB_GETCURSEL,0,(LPARAM)(LPSTR)0);
 				*/
-				vmodes[0].x=GetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_XRES,0,0);
-				vmodes[0].y=GetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_YRES,0,0);
-				vmodes[0].bpp=(SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_BPP,CB_GETCURSEL,0,(LPARAM)(LPSTR)0)+1)<<3;
+				vmodes[0].x = GetDlgItemInt(hwndDlg, IDC_VIDEOCONFIG_XRES, 0, 0);
+				vmodes[0].y = GetDlgItemInt(hwndDlg, IDC_VIDEOCONFIG_YRES, 0, 0);
+				vmodes[0].bpp = (SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_BPP, CB_GETCURSEL, 0, (LPARAM)(LPSTR)0) + 1) << 3;
 
 				//vmodes[0].xscale=GetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_XSCALE,0,0);
 				//vmodes[0].yscale=GetDlgItemInt(hwndDlg,IDC_VIDEOCONFIG_YSCALE,0,0);
-				vmodes[0].special=SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SCALER_FS,CB_GETCURSEL,0,(LPARAM)(LPSTR)0);
+				vmodes[0].special = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SCALER_FS, CB_GETCURSEL, 0, (LPARAM)(LPSTR)0);
 
 				winspecial = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SCALER_WIN, CB_GETCURSEL, 0, (LPARAM)(LPSTR)0);
 				directDrawModeWindowed = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_DIRECTDRAW_WIN, CB_GETCURSEL, 0, (LPARAM)(LPSTR)0) % DIRECTDRAW_MODES_TOTAL;
 				directDrawModeFullscreen = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_DIRECTDRAW_FS, CB_GETCURSEL, 0, (LPARAM)(LPSTR)0) % DIRECTDRAW_MODES_TOTAL;
 
-				if(IsDlgButtonChecked(hwndDlg,IDC_VIDEOCONFIG_FS)==BST_CHECKED)
-					fullscreen=1;
+				if (IsDlgButtonChecked(hwndDlg, IDC_VIDEOCONFIG_FS) == BST_CHECKED)
+					fullscreen = 1;
 				else
-					fullscreen=0;
+					fullscreen = 0;
 
-				if(IsDlgButtonChecked(hwndDlg,IDC_VIDEOCONFIG_AUTO_FS)==BST_CHECKED)
-					eoptions|=EO_FSAFTERLOAD;
+				if (IsDlgButtonChecked(hwndDlg, IDC_VIDEOCONFIG_AUTO_FS) == BST_CHECKED)
+					eoptions |= EO_FSAFTERLOAD;
 				else
-					eoptions&=~EO_FSAFTERLOAD;
+					eoptions &= ~EO_FSAFTERLOAD;
 
-				if(IsDlgButtonChecked(hwndDlg,IDC_VIDEOCONFIG_HIDEMOUSE)==BST_CHECKED)
-					eoptions|=EO_HIDEMOUSE;
+				if (IsDlgButtonChecked(hwndDlg, IDC_VIDEOCONFIG_HIDEMOUSE) == BST_CHECKED)
+					eoptions |= EO_HIDEMOUSE;
 				else
-					eoptions&=~EO_HIDEMOUSE;
+					eoptions &= ~EO_HIDEMOUSE;
 
 				eoptions &= ~(EO_FORCEISCALE | EO_FORCEASPECT);
-				if(IsDlgButtonChecked(hwndDlg,IDC_FORCE_INT_VIDEO_SCALARS)==BST_CHECKED)
-					eoptions|=EO_FORCEISCALE;
-				if(IsDlgButtonChecked(hwndDlg,IDC_FORCE_ASPECT_CORRECTION)==BST_CHECKED)
-					eoptions|=EO_FORCEASPECT;
+				if (IsDlgButtonChecked(hwndDlg, IDC_FORCE_INT_VIDEO_SCALARS) == BST_CHECKED)
+					eoptions |= EO_FORCEISCALE;
+				if (IsDlgButtonChecked(hwndDlg, IDC_FORCE_ASPECT_CORRECTION) == BST_CHECKED)
+					eoptions |= EO_FORCEASPECT;
 
 				winsizemulx = GetDlgItemDouble(hwndDlg, IDC_WINSIZE_MUL_X);
 				winsizemuly = GetDlgItemDouble(hwndDlg, IDC_WINSIZE_MUL_Y);
@@ -1400,38 +1431,38 @@ gornk:
 				if (tvAspectY < 0.1)
 					tvAspectY = 0.1;
 
-				winsync=SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_WIN,CB_GETCURSEL,0,(LPARAM)(LPSTR)0);
-				fssync=SendDlgItemMessage(hwndDlg,IDC_VIDEOCONFIG_SYNC_METHOD_FS,CB_GETCURSEL,0,(LPARAM)(LPSTR)0);
-				EndDialog(hwndDlg,0);
+				winsync = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_WIN, CB_GETCURSEL, 0, (LPARAM)(LPSTR)0);
+				fssync = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_SYNC_METHOD_FS, CB_GETCURSEL, 0, (LPARAM)(LPSTR)0);
+				EndDialog(hwndDlg, 0);
 				break;
-				case IDC_VIDEOCONFIG_TVASPECT:
-					bool enable = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_TVASPECT, BM_GETCHECK, 0, 0) == BST_CHECKED;
-					EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_X), enable);
-					EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_Y), enable);
-					EnableWindow(GetDlgItem(hwndDlg, IDC_STATIC_SLASHTEXT), enable);
-		}
+			case IDC_VIDEOCONFIG_TVASPECT:
+				bool enable = SendDlgItemMessage(hwndDlg, IDC_VIDEOCONFIG_TVASPECT, BM_GETCHECK, 0, 0) == BST_CHECKED;
+				EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_X), enable);
+				EnableWindow(GetDlgItem(hwndDlg, IDC_TVASPECT_Y), enable);
+				EnableWindow(GetDlgItem(hwndDlg, IDC_STATIC_SLASHTEXT), enable);
+			}
 	}
 	return 0;
 }
 
 void SetFSVideoMode()
 {
-	changerecursive=1;
-	if(!SetVideoMode(1))
+	changerecursive = 1;
+	if (!SetVideoMode(1))
 		SetVideoMode(0);
-	changerecursive=0;
+	changerecursive = 0;
 }
 
 
 void DoVideoConfigFix(void)
 {
-	FCEUI_DisableSpriteLimitation(eoptions&EO_NOSPRLIM);
+	FCEUI_DisableSpriteLimitation(eoptions & EO_NOSPRLIM);
 	UpdateRendBounds();
 }
 
 void PushCurrentVideoSettings()
 {
-	if(fullscreen)
+	if (fullscreen)
 	{
 		SetFSVideoMode();
 	}
@@ -1449,7 +1480,7 @@ void ConfigVideo(void)
 {
 	if ((vmodes[0].x <= 0) || (vmodes[0].y <= 0))
 		ResetCustomMode();
-	DialogBox(fceu_hInstance, "VIDEOCONFIG", hAppWnd, VideoConCallB); 
+	DialogBox(fceu_hInstance, "VIDEOCONFIG", hAppWnd, VideoConCallB);
 	DoVideoConfigFix();
 	PushCurrentVideoSettings();
 }
