@@ -92,6 +92,57 @@ extern int32 fps_scale_unpaused;
 
 using namespace std;
 
+static std::wstring FCEUWinStringToWide(const char* s)
+{
+	if (!s || !*s)
+		return std::wstring();
+
+	int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, NULL, 0);
+	UINT cp = CP_UTF8;
+	DWORD flags = MB_ERR_INVALID_CHARS;
+
+	if (wlen <= 0)
+	{
+		cp = CP_ACP;
+		flags = 0;
+		wlen = MultiByteToWideChar(cp, flags, s, -1, NULL, 0);
+	}
+
+	if (wlen <= 0)
+		return std::wstring();
+
+	std::wstring out;
+	out.resize(wlen - 1);
+	MultiByteToWideChar(cp, flags, s, -1, &out[0], wlen);
+	return out;
+}
+
+static std::wstring FCEUWinStringToWide(const std::string& s)
+{
+	return FCEUWinStringToWide(s.c_str());
+}
+
+static std::string FCEUWinWideToUTF8(const wchar_t* ws)
+{
+	if (!ws || !*ws)
+		return std::string();
+
+	int len = WideCharToMultiByte(CP_UTF8, 0, ws, -1, NULL, 0, NULL, NULL);
+	if (len <= 0)
+		return std::string();
+
+	std::string out;
+	out.resize(len - 1);
+	WideCharToMultiByte(CP_UTF8, 0, ws, -1, &out[0], len, NULL, NULL);
+	return out;
+}
+
+static void FCEUWinSetWindowTextUTF8(HWND hwnd, const std::string& text)
+{
+	std::wstring wtext = FCEUWinStringToWide(text);
+	SetWindowTextW(hwnd, wtext.c_str());
+}
+
 //----Context Menu - Some dynamically added menu items
 #define FCEUX_CONTEXT_UNHIDEMENU        60000
 #define FCEUX_CONTEXT_LOADLASTLUA       60001
@@ -115,7 +166,7 @@ HWND MainhWnd;				  //Main FCEUX(Parent) window Handle.  Dialogs should use GetM
 
 //Extern variables-------------------------------------
 extern bool movieSubtitles;
-extern FCEUGI *GameInfo;
+extern FCEUGI* GameInfo;
 extern int EnableAutosave;
 extern bool frameAdvanceLagSkip;
 extern bool turbo;
@@ -139,14 +190,14 @@ int GetCheckedAutoFirePattern();
 int GetCheckedAutoFireOffset();
 
 //Internal variables-------------------------------------
-char *md5_asciistr(uint8 digest[16]);
+char* md5_asciistr(uint8 digest[16]);
 static int winwidth, winheight;
 static volatile int nofocus = 0;
 static int tog = 0;					//Toggle for Hide Menu
 static bool loggingSound = false;
-static LONG WindowXC=1<<30,WindowYC;
+static LONG WindowXC = 1 << 30, WindowYC;
 int MainWindow_wndx, MainWindow_wndy;
-static uint32 mousex,mousey,mouseb;
+static uint32 mousex, mousey, mouseb;
 static int vchanged = 0;
 int menuYoffset = 0;
 bool wasPausedByCheats = false;		//For unpausing the emulator if paused by the cheats dialog
@@ -163,9 +214,9 @@ void OpenRamWatch();
 void SaveSnapshotAs();
 
 //Recent Menu Strings ------------------------------------
-char *recent_files[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+char* recent_files[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 const unsigned int MENU_FIRST_RECENT_FILE = 600;
-const unsigned int MAX_NUMBER_OF_RECENT_FILES = sizeof(recent_files)/sizeof(*recent_files);
+const unsigned int MAX_NUMBER_OF_RECENT_FILES = sizeof(recent_files) / sizeof(*recent_files);
 
 //Lua Console --------------------------------------------
 //TODO: these need to be in a header file instead
@@ -174,14 +225,14 @@ extern INT_PTR CALLBACK DlgLuaScriptDialog(HWND hDlg, UINT msg, WPARAM wParam, L
 extern void UpdateLuaConsole(const char* fname);
 
 //Recent Lua Menu ----------------------------------------
-char *recent_lua[] = { 0, 0, 0, 0, 0 };
+char* recent_lua[] = { 0, 0, 0, 0, 0 };
 const unsigned int LUA_FIRST_RECENT_FILE = 50000;
-const unsigned int MAX_NUMBER_OF_LUA_RECENT_FILES = sizeof(recent_lua)/sizeof(*recent_lua);
+const unsigned int MAX_NUMBER_OF_LUA_RECENT_FILES = sizeof(recent_lua) / sizeof(*recent_lua);
 
 //Recent Movie Menu -------------------------------------
-char *recent_movie[] = { 0, 0, 0, 0, 0 };
+char* recent_movie[] = { 0, 0, 0, 0, 0 };
 const unsigned int MOVIE_FIRST_RECENT_FILE = 51000;
-const unsigned int MAX_NUMBER_OF_MOVIE_RECENT_FILES = sizeof(recent_movie)/sizeof(*recent_movie);
+const unsigned int MAX_NUMBER_OF_MOVIE_RECENT_FILES = sizeof(recent_movie) / sizeof(*recent_movie);
 
 //Exported variables ------------------------------------
 
@@ -211,7 +262,7 @@ void SetMainWindowText()
 			str.append(StripPath(FCEUI_GetMovieName()));
 		}
 	}
-	SetWindowText(hAppWnd, str.c_str());
+	FCEUWinSetWindowTextUTF8(hAppWnd, str);
 }
 
 bool HasRecentFiles()
@@ -231,8 +282,8 @@ HWND GetMainHWND()
 
 int GetCheckedAutoFirePattern()
 {
-//adelikat: sorry, I'm sure there is an easier way to accomplish this.
-//This function allows the proper check to be displayed on the auto-fire pattern offset at start up when another autofire pattern is saved in config
+	//adelikat: sorry, I'm sure there is an easier way to accomplish this.
+	//This function allows the proper check to be displayed on the auto-fire pattern offset at start up when another autofire pattern is saved in config
 	if (AFon == 1 && AFoff == 2) return MENU_AUTOFIRE_PATTERN_2;
 	if (AFon == 1 && AFoff == 3) return MENU_AUTOFIRE_PATTERN_3;
 	if (AFon == 1 && AFoff == 4) return MENU_AUTOFIRE_PATTERN_4;
@@ -274,25 +325,25 @@ static void ConvertFCM(HWND hwndOwner)
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = hwndOwner;
 	ofn.lpstrFilter = "FCEU <2.0 Movie Files (*.fcm)\0*.fcm\0All Files (*.*)\0*.*\0\0";
-	ofn.lpstrFile = new char[640*1024]; //640K should be enough for anyone
+	ofn.lpstrFile = new char[640 * 1024]; //640K should be enough for anyone
 	ofn.lpstrFile[0] = 0;
-	ofn.nMaxFile = 640*1024;
+	ofn.nMaxFile = 640 * 1024;
 	ofn.lpstrInitialDir = initdir.c_str();
 	ofn.Flags = OFN_NOCHANGEDIR | OFN_HIDEREADONLY | OFN_ALLOWMULTISELECT | OFN_EXPLORER;
 	ofn.lpstrDefExt = "fcm";
 	ofn.lpstrTitle = "Select old movie(s) for conversion";
 
-	if(GetOpenFileName(&ofn))
+	if (GetOpenFileName(&ofn))
 	{
 		std::vector<std::string> todo;
 
 		//build a list of movies to convert. this might be one, or it might be many, depending on what the user selected
-		if(ofn.nFileExtension==0)
+		if (ofn.nFileExtension == 0)
 		{
 			//multiselect
 			std::string dir = ofn.lpstrFile;
 			char* cp = ofn.lpstrFile + dir.size() + 1;
-			while(*cp) 
+			while (*cp)
 			{
 				std::string fname = cp;
 				todo.push_back(dir + "/" + fname);
@@ -304,44 +355,45 @@ static void ConvertFCM(HWND hwndOwner)
 			todo.push_back(ofn.lpstrFile);
 		}
 
-		SetCursor(LoadCursor(0,IDC_WAIT));
+		SetCursor(LoadCursor(0, IDC_WAIT));
 
 		//convert each movie
 		int okcount = 0;
-		for(uint32 i=0;i<todo.size();i++)
+		for (uint32 i = 0; i < todo.size(); i++)
 		{
 			std::string infname = todo[i];
-			
+
 			//produce output filename
 			std::string outname;
 			size_t dot = infname.find_last_of(".");
-			if(dot == std::string::npos)
+			if (dot == std::string::npos)
 				outname = infname + ".fm2";
 			else
-				outname = infname.substr(0,dot) + ".fm2";
+				outname = infname.substr(0, dot) + ".fm2";
 
 			MovieData md;
 			EFCM_CONVERTRESULT result = convert_fcm(md, infname);
-			if(result==FCM_CONVERTRESULT_SUCCESS)
+			if (result == FCM_CONVERTRESULT_SUCCESS)
 			{
 				okcount++;
 				EMUFILE_FILE* outf = FCEUD_UTF8_fstream(outname, "wb");
-				md.dump(outf,false);
+				md.dump(outf, false);
 				delete outf;
-			} else {
+			}
+			else {
 				std::string msg = "Failure converting " + infname + "\r\n\r\n" + EFCM_CONVERTRESULT_message(result);
-				MessageBox(hwndOwner,msg.c_str(),"Failure converting fcm", 0);
+				MessageBox(hwndOwner, msg.c_str(), "Failure converting fcm", 0);
 			}
 		}
 
-		std::string okmsg = "Converted " + stditoa(okcount) + " movie(s). There were " + stditoa(todo.size()-okcount) + " failure(s).";
-		MessageBox(hwndOwner,okmsg.c_str(),"FCM Conversion results", 0);
+		std::string okmsg = "Converted " + stditoa(okcount) + " movie(s). There were " + stditoa(todo.size() - okcount) + " failure(s).";
+		MessageBox(hwndOwner, okmsg.c_str(), "FCM Conversion results", 0);
 	}
 
 	delete[] ofn.lpstrFile;
 }
 
-void CalcWindowSize(RECT *al)
+void CalcWindowSize(RECT* al)
 {
 	// Keep window size and input mapping based on the NES logical width.
 	// NTSC 2x has a wider internal buffer, but it should not change the
@@ -366,12 +418,12 @@ void CalcWindowSize(RECT *al)
 		GetWindowLong(hAppWnd, GWL_STYLE),
 		GetMenu(hAppWnd) != NULL,
 		GetWindowLong(hAppWnd, GWL_EXSTYLE)
-		);
+	);
 
 	al->right -= al->left;
 	al->left = 0;
 	al->bottom -= al->top;
-	al->top=0;
+	al->top = 0;
 }
 
 /// Updates the menu items that should only be enabled if a game is loaded.
@@ -379,7 +431,7 @@ void CalcWindowSize(RECT *al)
 void updateGameDependentMenus()
 {
 	// they are quite simple, enabled only when game is loaded
-	const int menu_ids[]= {
+	const int menu_ids[] = {
 		MENU_CLOSE_FILE,
 		ID_FILE_SCREENSHOT,
 		ID_FILE_SAVESCREENSHOTAS,
@@ -421,14 +473,14 @@ void updateGameDependentMenus()
 void UpdateCheckedMenuItems()
 {
 	bool spr, bg;
-	FCEUI_GetRenderPlanes(spr,bg);
+	FCEUI_GetRenderPlanes(spr, bg);
 
-	static int *polo[] = { &genie, &status_icon};
-	static int polo2[]={ MENU_GAME_GENIE, ID_DISPLAY_MOVIESTATUSICON };
+	static int* polo[] = { &genie, &status_icon };
+	static int polo2[] = { MENU_GAME_GENIE, ID_DISPLAY_MOVIESTATUSICON };
 	int x;
 
 	// Check or uncheck the necessary menu items
-	for(x = 0; x < sizeof(polo) / sizeof(*polo); x++)
+	for (x = 0; x < sizeof(polo) / sizeof(*polo); x++)
 	{
 		CheckMenuItem(fceumenu, polo2[x], *polo[x] ? MF_CHECKED : MF_UNCHECKED);
 	}
@@ -449,28 +501,28 @@ void UpdateCheckedMenuItems()
 	CheckMenuItem(fceumenu, MENU_RUN_IN_BACKGROUND, eoptions & EO_BGRUN ? MF_CHECKED : MF_UNCHECKED);
 	CheckMenuItem(fceumenu, MENU_BACKGROUND_INPUT, EnableBackgroundInput ? MF_CHECKED : MF_UNCHECKED);
 	CheckMenuItem(fceumenu, MENU_ENABLE_AUTOSAVE, EnableAutosave ? MF_CHECKED : MF_UNCHECKED);
-	CheckMenuItem(fceumenu, MENU_DISPLAY_FA_LAGSKIP, frameAdvanceLagSkip?MF_CHECKED : MF_UNCHECKED);
-	CheckMenuItem(fceumenu, MENU_CONFIG_BINDSAVES, bindSavestate?MF_CHECKED : MF_UNCHECKED);
-	CheckMenuItem(fceumenu, ID_ENABLE_BACKUPSAVESTATES, backupSavestates?MF_CHECKED : MF_UNCHECKED);
-	CheckMenuItem(fceumenu, ID_ENABLE_COMPRESSSAVESTATES, compressSavestates?MF_CHECKED : MF_UNCHECKED);
-	CheckMenuItem(fceumenu, ID_ENABLE_AUTORESUME, AutoResumePlay?MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, MENU_DISPLAY_FA_LAGSKIP, frameAdvanceLagSkip ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, MENU_CONFIG_BINDSAVES, bindSavestate ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, ID_ENABLE_BACKUPSAVESTATES, backupSavestates ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, ID_ENABLE_COMPRESSSAVESTATES, compressSavestates ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, ID_ENABLE_AUTORESUME, AutoResumePlay ? MF_CHECKED : MF_UNCHECKED);
 
 	//Config - Display SubMenu
-	CheckMenuItem(fceumenu, MENU_DISPLAY_LAGCOUNTER, lagCounterDisplay?MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, MENU_DISPLAY_LAGCOUNTER, lagCounterDisplay ? MF_CHECKED : MF_UNCHECKED);
 	CheckMenuItem(fceumenu, ID_DISPLAY_FRAMECOUNTER, frame_display ? MF_CHECKED : MF_UNCHECKED);
 	CheckMenuItem(fceumenu, ID_DISPLAY_RERECORDCOUNTER, rerecord_display ? MF_CHECKED : MF_UNCHECKED);
 	CheckMenuItem(fceumenu, ID_DISPLAY_FPS, FCEUI_ShowFPS() ? MF_CHECKED : MF_UNCHECKED);
 	CheckMenuItem(fceumenu, ID_DISPLAY_MOVIESTATUSICON, status_icon ? MF_CHECKED : MF_UNCHECKED);
-	CheckMenuItem(fceumenu, MENU_DISPLAY_BG, bg?MF_CHECKED:MF_UNCHECKED);
-	CheckMenuItem(fceumenu, MENU_DISPLAY_OBJ, spr?MF_CHECKED:MF_UNCHECKED);
-	CheckMenuItem(fceumenu, ID_INPUTDISPLAY_OLDSTYLEDISP, oldInputDisplay?MF_CHECKED:MF_UNCHECKED);
+	CheckMenuItem(fceumenu, MENU_DISPLAY_BG, bg ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, MENU_DISPLAY_OBJ, spr ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(fceumenu, ID_INPUTDISPLAY_OLDSTYLEDISP, oldInputDisplay ? MF_CHECKED : MF_UNCHECKED);
 
 	//Config - Region SubMenu
 	if (PAL)
 		CheckMenuRadioItem(fceumenu, MENU_NTSC, MENU_DENDY, MENU_PAL, MF_BYCOMMAND);
 	else if (dendy)
 		CheckMenuRadioItem(fceumenu, MENU_NTSC, MENU_DENDY, MENU_DENDY, MF_BYCOMMAND);
-	else		
+	else
 		CheckMenuRadioItem(fceumenu, MENU_NTSC, MENU_DENDY, MENU_NTSC, MF_BYCOMMAND);
 
 	//Config - RAM Init SubMenu
@@ -486,21 +538,21 @@ void UpdateCheckedMenuItems()
 	// Check input display
 	switch (input_display)
 	{
-		case 0: // Off
-			CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_0, MF_BYCOMMAND);
-			break;
-		case 1: // 1 player
-			CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_1, MF_BYCOMMAND);
-			break;
-		case 2: // 2 player
-			CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_2, MF_BYCOMMAND);
-			break;
+	case 0: // Off
+		CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_0, MF_BYCOMMAND);
+		break;
+	case 1: // 1 player
+		CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_1, MF_BYCOMMAND);
+		break;
+	case 2: // 2 player
+		CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_2, MF_BYCOMMAND);
+		break;
 		// note: input display can actually have a 3 player display option but is skipped in the hotkey toggle so it is skipped here as well
-		case 4: // 4 player
-			CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_4, MF_BYCOMMAND);
-			break;
-		default:
-			break;
+	case 4: // 4 player
+		CheckMenuRadioItem(fceumenu, MENU_INPUTDISPLAY_0, MENU_INPUTDISPLAY_4, MENU_INPUTDISPLAY_4, MF_BYCOMMAND);
+		break;
+	default:
+		break;
 	}
 	UpdateMenuHotkeys(FCEUMENU_MAIN_INPUTDISPLAY);
 }
@@ -512,7 +564,7 @@ void UpdateContextMenuItems(HMENU context, int whichContext)
 	string undoSavestate = "Undo savestate";
 	string redoSavestate = "Redo savestate";
 
-	CheckMenuItem(context,ID_CONTEXT_FULLSAVESTATES,MF_BYCOMMAND | (fullSaveStateLoads ? MF_CHECKED : MF_UNCHECKED));
+	CheckMenuItem(context, ID_CONTEXT_FULLSAVESTATES, MF_BYCOMMAND | (fullSaveStateLoads ? MF_CHECKED : MF_UNCHECKED));
 
 	if (FCEUMOV_Mode(MOVIEMODE_PLAY | MOVIEMODE_RECORD))
 		EnableMenuItem(context, FCEUX_CONTEXT_TOGGLE_RECORDING, MF_BYCOMMAND | MF_ENABLED);
@@ -524,7 +576,8 @@ void UpdateContextMenuItems(HMENU context, int whichContext)
 		EnableMenuItem(context, FCEUX_CONTEXT_INSERT_1_FRAME, MF_BYCOMMAND | MF_ENABLED);
 		EnableMenuItem(context, FCEUX_CONTEXT_DELETE_1_FRAME, MF_BYCOMMAND | MF_ENABLED);
 		EnableMenuItem(context, FCEUX_CONTEXT_TRUNCATE_MOVIE, MF_BYCOMMAND | MF_ENABLED);
-	} else
+	}
+	else
 	{
 		EnableMenuItem(context, FCEUX_CONTEXT_INSERT_1_FRAME, MF_BYCOMMAND | MF_GRAYED);
 		EnableMenuItem(context, FCEUX_CONTEXT_DELETE_1_FRAME, MF_BYCOMMAND | MF_GRAYED);
@@ -536,9 +589,9 @@ void UpdateContextMenuItems(HMENU context, int whichContext)
 
 	//Undo Loadstate
 	if (CheckBackupSaveStateExist() && (undoLS || redoLS))
-		EnableMenuItem(context,FCEUX_CONTEXT_UNDOLOADSTATE,MF_BYCOMMAND | MF_ENABLED);
+		EnableMenuItem(context, FCEUX_CONTEXT_UNDOLOADSTATE, MF_BYCOMMAND | MF_ENABLED);
 	else
-		EnableMenuItem(context,FCEUX_CONTEXT_UNDOLOADSTATE,MF_BYCOMMAND | MF_GRAYED);
+		EnableMenuItem(context, FCEUX_CONTEXT_UNDOLOADSTATE, MF_BYCOMMAND | MF_GRAYED);
 	if (redoLS)
 		ChangeContextMenuItemText(FCEUX_CONTEXT_UNDOLOADSTATE, redoLoadstate, context);
 	else
@@ -546,52 +599,52 @@ void UpdateContextMenuItems(HMENU context, int whichContext)
 
 	//Undo Savestate
 	if (undoSS || redoSS)		//If undo or redo, enable Undo savestate, else keep it gray
-		EnableMenuItem(context,FCEUX_CONTEXT_UNDOSAVESTATE,MF_BYCOMMAND | MF_ENABLED);
+		EnableMenuItem(context, FCEUX_CONTEXT_UNDOSAVESTATE, MF_BYCOMMAND | MF_ENABLED);
 	else
-		EnableMenuItem(context,FCEUX_CONTEXT_UNDOSAVESTATE,MF_BYCOMMAND | MF_GRAYED);
+		EnableMenuItem(context, FCEUX_CONTEXT_UNDOSAVESTATE, MF_BYCOMMAND | MF_GRAYED);
 	if (redoSS)
 		ChangeContextMenuItemText(FCEUX_CONTEXT_UNDOSAVESTATE, redoSavestate, context);
 	else
 		ChangeContextMenuItemText(FCEUX_CONTEXT_UNDOSAVESTATE, undoSavestate, context);
-	
+
 	//Rewind to last auto-save
-	if(EnableAutosave && AutoSS)
-		EnableMenuItem(context,FCEUX_CONTEXT_REWINDTOLASTAUTO,MF_BYCOMMAND | MF_ENABLED);
+	if (EnableAutosave && AutoSS)
+		EnableMenuItem(context, FCEUX_CONTEXT_REWINDTOLASTAUTO, MF_BYCOMMAND | MF_ENABLED);
 	else
-		EnableMenuItem(context,FCEUX_CONTEXT_REWINDTOLASTAUTO,MF_BYCOMMAND | MF_GRAYED);
+		EnableMenuItem(context, FCEUX_CONTEXT_REWINDTOLASTAUTO, MF_BYCOMMAND | MF_GRAYED);
 
 	//Load last ROM
 	if (recent_files[0])
-		EnableMenuItem(context,FCEUX_CONTEXT_RECENTROM1,MF_BYCOMMAND | MF_ENABLED);
+		EnableMenuItem(context, FCEUX_CONTEXT_RECENTROM1, MF_BYCOMMAND | MF_ENABLED);
 	else
-		EnableMenuItem(context,FCEUX_CONTEXT_RECENTROM1,MF_BYCOMMAND | MF_GRAYED);
+		EnableMenuItem(context, FCEUX_CONTEXT_RECENTROM1, MF_BYCOMMAND | MF_GRAYED);
 
 	//Add Lua separator if either lua condition is true (yeah, a little ugly but it works)
-	#ifdef _S9XLUA_H
+#ifdef _S9XLUA_H
 	if (recent_lua[0] || FCEU_LuaRunning())
 		InsertMenu(context, 0xFFFF, MF_SEPARATOR, 0, "");
 
 	//If a recent lua file exists, add Load Last Lua
 	if (recent_lua[0])
 		InsertMenu(context, 0xFFFF, MF_BYCOMMAND, FCEUX_CONTEXT_LOADLASTLUA, "Load last Lua");
-		
+
 	//If lua is loaded, add a stop lua item
 	if (FCEU_LuaRunning())
 		InsertMenu(context, 0xFFFF, MF_BYCOMMAND, FCEUX_CONTEXT_CLOSELUAWINDOWS, "Close All Script Windows");
-	#endif
+#endif
 
 	//If menu is hidden, add an Unhide menu option
 	if (tog)
 	{
 		InsertMenu(context, 0xFFFF, MF_SEPARATOR, 0, "");
-		InsertMenu(context,0xFFFF, MF_BYCOMMAND, FCEUX_CONTEXT_UNHIDEMENU, HOTKEYMENUINDEX::getQualifiedMenuText("Unhide Menu", EMUCMD_HIDE_MENU_TOGGLE).c_str());
+		InsertMenu(context, 0xFFFF, MF_BYCOMMAND, FCEUX_CONTEXT_UNHIDEMENU, HOTKEYMENUINDEX::getQualifiedMenuText("Unhide Menu", EMUCMD_HIDE_MENU_TOGGLE).c_str());
 	}
 
-	if (whichContext > 1 && currMovieData.subtitles.size() != 0){
+	if (whichContext > 1 && currMovieData.subtitles.size() != 0) {
 		// At position 3 is "View comments and subtitles". Insert this there:
-		InsertMenu(context,0x3, MF_BYPOSITION, FCEUX_CONTEXT_TOGGLESUBTITLES, HOTKEYMENUINDEX::getQualifiedMenuText(movieSubtitles ? "Subtitle Display: On" : "Subtitle Display: Off", EMUCMD_MISC_DISPLAY_MOVIESUBTITLES).c_str());
+		InsertMenu(context, 0x3, MF_BYPOSITION, FCEUX_CONTEXT_TOGGLESUBTITLES, HOTKEYMENUINDEX::getQualifiedMenuText(movieSubtitles ? "Subtitle Display: On" : "Subtitle Display: Off", EMUCMD_MISC_DISPLAY_MOVIESUBTITLES).c_str());
 		// At position 4(+1) is after View comments and subtitles. Insert this there:
-		InsertMenu(context,0x5, MF_BYPOSITION, FCEUX_CONTEXT_DUMPSUBTITLES, "Dump Subtitles to SRT file");
+		InsertMenu(context, 0x5, MF_BYPOSITION, FCEUX_CONTEXT_DUMPSUBTITLES, "Dump Subtitles to SRT file");
 	}
 
 }
@@ -599,7 +652,7 @@ void UpdateContextMenuItems(HMENU context, int whichContext)
 
 //adelikat: This removes a recent menu item from any recent menu, and shrinks the list accordingly
 //The update recent menu function will need to be run after this
-void RemoveRecentItem(unsigned int which, char**bufferArray, const unsigned int MAX)
+void RemoveRecentItem(unsigned int which, char** bufferArray, const unsigned int MAX)
 {
 	//which = array item to remove
 	//buffer = char array of the recent menu
@@ -608,24 +661,24 @@ void RemoveRecentItem(unsigned int which, char**bufferArray, const unsigned int 
 	//Just in case
 	if (which >= MAX)
 		return;
-	
+
 	//Remove the item
-	if(bufferArray[which])
+	if (bufferArray[which])
 	{
 		free(bufferArray[which]);
 	}
 
 	//If the item is not the last one in the list, shift the remaining ones up
-	if (which < (MAX-1))
+	if (which < (MAX - 1))
 	{
 		//Move the remaining items up
-		for(unsigned int x = which+1; x < MAX; x++)
+		for (unsigned int x = which + 1; x < MAX; x++)
 		{
-			bufferArray[x-1] = bufferArray[x];	//Shift each remaining item up by 1
+			bufferArray[x - 1] = bufferArray[x];	//Shift each remaining item up by 1
 		}
 	}
-	
-	bufferArray[MAX-1] = 0;	//Clear out the last item since it is empty now no matter what
+
+	bufferArray[MAX - 1] = 0;	//Clear out the last item since it is empty now no matter what
 }
 
 /// Updates recent files / recent directories menu
@@ -633,7 +686,7 @@ void RemoveRecentItem(unsigned int which, char**bufferArray, const unsigned int 
 /// @param strs Strings to add to the menu
 /// @param mitem Menu ID of the recent files / directory menu
 /// @param baseid Menu ID of the first subitem
-void UpdateRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int baseid)
+void UpdateRMenu(HMENU menu, char** strs, unsigned int mitem, unsigned int baseid)
 {
 	// UpdateRMenu(recentmenu, recent_files, MENU_RECENT_FILES, MENU_FIRST_RECENT_FILE);
 
@@ -650,30 +703,27 @@ void UpdateRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int basei
 	SetMenuItemInfo(GetSubMenu(fceumenu, 0), mitem, FALSE, &moo);
 
 	// Remove all recent files submenus
-	for(x = 0; x < MAX_NUMBER_OF_RECENT_FILES; x++)
+	for (x = 0; x < MAX_NUMBER_OF_RECENT_FILES; x++)
 	{
 		RemoveMenu(menu, baseid + x, MF_BYCOMMAND);
 	}
 
 	// Recreate the menus
-	for(x = MAX_NUMBER_OF_RECENT_FILES - 1; x >= 0; x--)
-	{  
+	for (x = MAX_NUMBER_OF_RECENT_FILES - 1; x >= 0; x--)
+	{
 		// Skip empty strings
-		if(!strs[x])
+		if (!strs[x])
 			continue;
 
 		std::string tmp = strs[x];
 		std::string archiveName, fileName, fileToOpen;
-		FCEU_SplitArchiveFilename(tmp,archiveName,fileName,fileToOpen);
-		if(archiveName != "")
+		FCEU_SplitArchiveFilename(tmp, archiveName, fileName, fileToOpen);
+		if (archiveName != "")
 			tmp = archiveName + " <" + fileName + ">";
 
 		//clamp this string to 128 chars
-		if(tmp.size()>128)
-			tmp = tmp.substr(0,128);
-
-		moo.cbSize = sizeof(moo);
-		moo.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
+		if (tmp.size() > 128)
+			tmp = tmp.substr(0, 128);
 
 		//// Fill in the menu text.
 		//if(strlen(strs[x]) < 128)
@@ -685,12 +735,17 @@ void UpdateRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int basei
 		//	sprintf(tmp, "&%d. %s", ( x + 1 ) % 10, strs[x] + strlen( strs[x] ) - 127);
 		//}
 
-		// Insert the menu item
-		moo.cch = tmp.size();
-		moo.fType = 0;
-		moo.wID = baseid + x;
-		moo.dwTypeData = (LPSTR)tmp.c_str();
-		InsertMenuItem(menu, 0, 1, &moo);
+		// Insert the menu item.  recent_files[] stores UTF-8 paths.
+		std::wstring wtmp = FCEUWinStringToWide(tmp);
+		MENUITEMINFOW moow;
+		memset(&moow, 0, sizeof(moow));
+		moow.cbSize = sizeof(moow);
+		moow.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
+		moow.cch = (UINT)wtmp.size();
+		moow.fType = MFT_STRING;
+		moow.wID = baseid + x;
+		moow.dwTypeData = (LPWSTR)wtmp.c_str();
+		InsertMenuItemW(menu, 0, TRUE, &moow);
 	}
 
 	DrawMenuBar(hAppWnd);
@@ -706,22 +761,22 @@ void UpdateRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int basei
 void UpdateRecentArray(const char* addString, char** bufferArray, unsigned int arrayLen, HMENU menu, unsigned int menuItem, unsigned int baseId)
 {
 	// Try to find out if the filename is already in the recent files list.
-	for(unsigned int x = 0; x < arrayLen; x++)
+	for (unsigned int x = 0; x < arrayLen; x++)
 	{
-		if(bufferArray[x])
+		if (bufferArray[x])
 		{
-			if(!strcmp(bufferArray[x], addString))    // Item is already in list.
+			if (!strcmp(bufferArray[x], addString))    // Item is already in list.
 			{
 				// If the filename is in the file list don't add it again.
 				// Move it up in the list instead.
 
 				int y;
-				char *tmp;
+				char* tmp;
 
 				// Save pointer.
 				tmp = bufferArray[x];
 
-				for(y = x; y; y--)
+				for (y = x; y; y--)
 				{
 					// Move items down.
 					bufferArray[y] = bufferArray[y - 1];
@@ -742,13 +797,13 @@ void UpdateRecentArray(const char* addString, char** bufferArray, unsigned int a
 
 	// If there's no space left in the recent files list, get rid of the last
 	// item in the list.
-	if(bufferArray[arrayLen - 1])
+	if (bufferArray[arrayLen - 1])
 	{
 		free(bufferArray[arrayLen - 1]);
 	}
 
 	// Move the other items down.
-	for(unsigned int x = arrayLen - 1; x; x--)
+	for (unsigned int x = arrayLen - 1; x; x--)
 	{
 		bufferArray[x] = bufferArray[x - 1];
 	}
@@ -763,7 +818,7 @@ void UpdateRecentArray(const char* addString, char** bufferArray, unsigned int a
 
 /// Add a filename to the recent files list.
 /// @param filename Name of the file to add.
-void AddRecentFile(const char *filename)
+void AddRecentFile(const char* filename)
 {
 	UpdateRecentArray(filename, recent_files, MAX_NUMBER_OF_RECENT_FILES, recentmenu, MENU_RECENT_FILES, MENU_FIRST_RECENT_FILE);
 }
@@ -771,7 +826,7 @@ void AddRecentFile(const char *filename)
 void LoadRecentRom(int slot)
 {
 	char*& fname = recent_files[slot];
-	if(fname)
+	if (fname)
 	{
 		if (!ALoad(fname))
 		{
@@ -785,7 +840,7 @@ void LoadRecentRom(int slot)
 	}
 }
 
-void UpdateLuaRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int baseid)
+void UpdateLuaRMenu(HMENU menu, char** strs, unsigned int mitem, unsigned int baseid)
 {
 	MENUITEMINFO moo;
 	int x;
@@ -800,33 +855,35 @@ void UpdateLuaRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int ba
 	SetMenuItemInfo(GetSubMenu(fceumenu, 0), mitem, FALSE, &moo);
 
 	// Remove all recent files submenus
-	for(x = 0; x < MAX_NUMBER_OF_LUA_RECENT_FILES; x++)
+	for (x = 0; x < MAX_NUMBER_OF_LUA_RECENT_FILES; x++)
 	{
 		RemoveMenu(menu, baseid + x, MF_BYCOMMAND);
 	}
 
 	// Recreate the menus
-	for(x = MAX_NUMBER_OF_LUA_RECENT_FILES - 1; x >= 0; x--)
-	{  
+	for (x = MAX_NUMBER_OF_LUA_RECENT_FILES - 1; x >= 0; x--)
+	{
 		// Skip empty strings
-		if(!strs[x])
+		if (!strs[x])
 			continue;
 
 		string tmp = strs[x];
-		
-		//clamp this string to 128 chars
-		if(tmp.size()>128)
-			tmp = tmp.substr(0,128);
 
-		moo.cbSize = sizeof(moo);
-		moo.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
-		
-		// Insert the menu item
-		moo.cch = tmp.size();
-		moo.fType = 0;
-		moo.wID = baseid + x;
-		moo.dwTypeData = (LPSTR)tmp.c_str();
-		InsertMenuItem(menu, 0, 1, &moo);
+		//clamp this string to 128 chars
+		if (tmp.size() > 128)
+			tmp = tmp.substr(0, 128);
+
+		// Insert the menu item.  Recent Lua/movie filenames may contain UTF-8.
+		std::wstring wtmp = FCEUWinStringToWide(tmp);
+		MENUITEMINFOW moow;
+		memset(&moow, 0, sizeof(moow));
+		moow.cbSize = sizeof(moow);
+		moow.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
+		moow.cch = (UINT)wtmp.size();
+		moow.fType = MFT_STRING;
+		moow.wID = baseid + x;
+		moow.dwTypeData = (LPWSTR)wtmp.c_str();
+		InsertMenuItemW(menu, 0, TRUE, &moow);
 	}
 
 	DrawMenuBar(hAppWnd);
@@ -835,22 +892,22 @@ void UpdateLuaRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int ba
 void UpdateRecentLuaArray(const char* addString, char** bufferArray, unsigned int arrayLen, HMENU menu, unsigned int menuItem, unsigned int baseId)
 {
 	// Try to find out if the filename is already in the recent files list.
-	for(unsigned int x = 0; x < arrayLen; x++)
+	for (unsigned int x = 0; x < arrayLen; x++)
 	{
-		if(bufferArray[x])
+		if (bufferArray[x])
 		{
-			if(!strcmp(bufferArray[x], addString))    // Item is already in list.
+			if (!strcmp(bufferArray[x], addString))    // Item is already in list.
 			{
 				// If the filename is in the file list don't add it again.
 				// Move it up in the list instead.
 
 				int y;
-				char *tmp;
+				char* tmp;
 
 				// Save pointer.
 				tmp = bufferArray[x];
 
-				for(y = x; y; y--)
+				for (y = x; y; y--)
 				{
 					// Move items down.
 					bufferArray[y] = bufferArray[y - 1];
@@ -871,13 +928,13 @@ void UpdateRecentLuaArray(const char* addString, char** bufferArray, unsigned in
 
 	// If there's no space left in the recent files list, get rid of the last
 	// item in the list.
-	if(bufferArray[arrayLen - 1])
+	if (bufferArray[arrayLen - 1])
 	{
 		free(bufferArray[arrayLen - 1]);
 	}
 
 	// Move the other items down.
-	for(unsigned int x = arrayLen - 1; x; x--)
+	for (unsigned int x = arrayLen - 1; x; x--)
 	{
 		bufferArray[x] = bufferArray[x - 1];
 	}
@@ -891,13 +948,13 @@ void UpdateRecentLuaArray(const char* addString, char** bufferArray, unsigned in
 
 }
 
-void AddRecentLuaFile(const char *filename)
+void AddRecentLuaFile(const char* filename)
 {
-	UpdateRecentLuaArray(filename, recent_lua, MAX_NUMBER_OF_LUA_RECENT_FILES, recentluamenu, MENU_LUA_RECENT, LUA_FIRST_RECENT_FILE); 
+	UpdateRecentLuaArray(filename, recent_lua, MAX_NUMBER_OF_LUA_RECENT_FILES, recentluamenu, MENU_LUA_RECENT, LUA_FIRST_RECENT_FILE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void UpdateMovieRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int baseid)
+void UpdateMovieRMenu(HMENU menu, char** strs, unsigned int mitem, unsigned int baseid)
 {
 	MENUITEMINFO moo;
 	int x;
@@ -912,33 +969,35 @@ void UpdateMovieRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int 
 	SetMenuItemInfo(GetSubMenu(fceumenu, 0), mitem, FALSE, &moo);
 
 	// Remove all recent files submenus
-	for(x = 0; x < MAX_NUMBER_OF_MOVIE_RECENT_FILES; x++)
+	for (x = 0; x < MAX_NUMBER_OF_MOVIE_RECENT_FILES; x++)
 	{
 		RemoveMenu(menu, baseid + x, MF_BYCOMMAND);
 	}
 
 	// Recreate the menus
-	for(x = MAX_NUMBER_OF_MOVIE_RECENT_FILES - 1; x >= 0; x--)
-	{  
+	for (x = MAX_NUMBER_OF_MOVIE_RECENT_FILES - 1; x >= 0; x--)
+	{
 		// Skip empty strings
-		if(!strs[x])
+		if (!strs[x])
 			continue;
 
 		string tmp = strs[x];
-		
-		//clamp this string to 128 chars
-		if(tmp.size()>128)
-			tmp = tmp.substr(0,128);
 
-		moo.cbSize = sizeof(moo);
-		moo.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
-		
-		// Insert the menu item
-		moo.cch = tmp.size();
-		moo.fType = 0;
-		moo.wID = baseid + x;
-		moo.dwTypeData = (LPSTR)tmp.c_str();
-		InsertMenuItem(menu, 0, 1, &moo);
+		//clamp this string to 128 chars
+		if (tmp.size() > 128)
+			tmp = tmp.substr(0, 128);
+
+		// Insert the menu item.  Recent Lua/movie filenames may contain UTF-8.
+		std::wstring wtmp = FCEUWinStringToWide(tmp);
+		MENUITEMINFOW moow;
+		memset(&moow, 0, sizeof(moow));
+		moow.cbSize = sizeof(moow);
+		moow.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
+		moow.cch = (UINT)wtmp.size();
+		moow.fType = MFT_STRING;
+		moow.wID = baseid + x;
+		moow.dwTypeData = (LPWSTR)wtmp.c_str();
+		InsertMenuItemW(menu, 0, TRUE, &moow);
 	}
 
 	DrawMenuBar(hAppWnd);
@@ -947,22 +1006,22 @@ void UpdateMovieRMenu(HMENU menu, char **strs, unsigned int mitem, unsigned int 
 void UpdateRecentMovieArray(const char* addString, char** bufferArray, unsigned int arrayLen, HMENU menu, unsigned int menuItem, unsigned int baseId)
 {
 	// Try to find out if the filename is already in the recent files list.
-	for(unsigned int x = 0; x < arrayLen; x++)
+	for (unsigned int x = 0; x < arrayLen; x++)
 	{
-		if(bufferArray[x])
+		if (bufferArray[x])
 		{
-			if(!strcmp(bufferArray[x], addString))    // Item is already in list.
+			if (!strcmp(bufferArray[x], addString))    // Item is already in list.
 			{
 				// If the filename is in the file list don't add it again.
 				// Move it up in the list instead.
 
 				int y;
-				char *tmp;
+				char* tmp;
 
 				// Save pointer.
 				tmp = bufferArray[x];
 
-				for(y = x; y; y--)
+				for (y = x; y; y--)
 				{
 					// Move items down.
 					bufferArray[y] = bufferArray[y - 1];
@@ -983,13 +1042,13 @@ void UpdateRecentMovieArray(const char* addString, char** bufferArray, unsigned 
 
 	// If there's no space left in the recent files list, get rid of the last
 	// item in the list.
-	if(bufferArray[arrayLen - 1])
+	if (bufferArray[arrayLen - 1])
 	{
 		free(bufferArray[arrayLen - 1]);
 	}
 
 	// Move the other items down.
-	for(unsigned int x = arrayLen - 1; x; x--)
+	for (unsigned int x = arrayLen - 1; x; x--)
 	{
 		bufferArray[x] = bufferArray[x - 1];
 	}
@@ -1003,9 +1062,9 @@ void UpdateRecentMovieArray(const char* addString, char** bufferArray, unsigned 
 
 }
 
-void AddRecentMovieFile(const char *filename)
+void AddRecentMovieFile(const char* filename)
 {
-	UpdateRecentMovieArray(filename, recent_movie, MAX_NUMBER_OF_MOVIE_RECENT_FILES, recentmoviemenu, MENU_MOVIE_RECENT, MOVIE_FIRST_RECENT_FILE); 
+	UpdateRecentMovieArray(filename, recent_movie, MAX_NUMBER_OF_MOVIE_RECENT_FILES, recentmoviemenu, MENU_MOVIE_RECENT, MOVIE_FIRST_RECENT_FILE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1014,7 +1073,7 @@ void AddRecentMovieFile(const char *filename)
 //@param hide_menu Flag to turn the main menu on (0) or off (1) 
 void HideMenu(unsigned int hide_menu)
 {
-	if(hide_menu)
+	if (hide_menu)
 	{
 		SetMenu(hAppWnd, 0);
 	}
@@ -1036,8 +1095,9 @@ void HideFWindow(int h)
 		WindowYC = bo.top;
 
 		SetMenu(hAppWnd, 0);
-		desa=WS_POPUP | WS_CLIPSIBLINGS;  
-	} else
+		desa = WS_POPUP | WS_CLIPSIBLINGS;
+	}
+	else
 	{
 		desa = WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS;
 		HideMenu(tog);
@@ -1046,14 +1106,14 @@ void HideFWindow(int h)
 		SetWindowPos(hAppWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOMOVE | SWP_NOREPOSITION | SWP_NOSIZE);
 	}
 
-	SetWindowLongPtr(hAppWnd, GWL_STYLE, desa | ( GetWindowLong(hAppWnd, GWL_STYLE) & WS_VISIBLE ));
+	SetWindowLongPtr(hAppWnd, GWL_STYLE, desa | (GetWindowLong(hAppWnd, GWL_STYLE) & WS_VISIBLE));
 	SetWindowPos(hAppWnd, 0, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOMOVE | SWP_NOREPOSITION | SWP_NOSIZE | SWP_NOZORDER);
 }
 
 //Toggles the display status of the main menu.
 void ToggleHideMenu(void)
-{ 
-	if(!fullscreen && !nofocus && (GameInfo || tog))
+{
+	if (!fullscreen && !nofocus && (GameInfo || tog))
 	{
 		tog ^= 1;
 		HideMenu(tog);
@@ -1081,28 +1141,28 @@ void CloseGame()
 	}
 }
 
-bool ALoad(const char *nameo, char* innerFilename, bool silent)
+bool ALoad(const char* nameo, char* innerFilename, bool silent)
 {
-	FILE* patchTrial = fopen(nameo, "rb");
-	if(patchTrial)
+	FILE* patchTrial = FCEUD_UTF8fopen(nameo, "rb");
+	if (patchTrial)
 	{
-		char sig[10] = {0};
-		fread(sig,1,5,patchTrial);
+		char sig[10] = { 0 };
+		fread(sig, 1, 5, patchTrial);
 		fclose(patchTrial);
-		if(!strcmp(sig,"PATCH"))
+		if (!strcmp(sig, "PATCH"))
 		{
 			//assuming it's a patch:
 
 			//if nothing's loaded, we can't load this
-			if(!LoadedRomFName[0])
+			if (!LoadedRomFName[0])
 				return false;
 
 			//ok, set this as a patch and load it
 			//use a temp std::string to avoid problems copying from LoadedRomFName, to LoadedRomFName
 			//pass nullptr as innerFilename -- see, it's not used here anyway
-			strcpy(LoadedRomFNamePatchToUse,nameo);
+			strcpy(LoadedRomFNamePatchToUse, nameo);
 			std::string tmp_LoadedRomFName = LoadedRomFName;
-			bool ret = ALoad(tmp_LoadedRomFName.c_str(),nullptr,silent);
+			bool ret = ALoad(tmp_LoadedRomFName.c_str(), nullptr, silent);
 
 			//clear the patch file. FCEUX doesn't seem to ever reload the roms (?) so it can't need to reuse it
 			//and if it does.. well.. it won't be patched.
@@ -1129,26 +1189,26 @@ bool ALoad(const char *nameo, char* innerFilename, bool silent)
 		PushCurrentVideoSettings();
 
 		std::string recentFileName = nameo;
-		if(GameInfo->archiveFilename && GameInfo->archiveCount>1)
+		if (GameInfo->archiveFilename && GameInfo->archiveCount > 1)
 			recentFileName = (std::string)GameInfo->archiveFilename + "|" + GameInfo->filename;
 		else
 			recentFileName = nameo;
-		
+
 		AddRecentFile(recentFileName.c_str());
 
 		RefreshThrottleFPS();
 
-		if(eoptions & EO_HIDEMENU && !tog)
+		if (eoptions & EO_HIDEMENU && !tog)
 		{
 			ToggleHideMenu();
 		}
 
-		if(eoptions & EO_FSAFTERLOAD)
+		if (eoptions & EO_FSAFTERLOAD)
 		{
 			SetFSVideoMode();
 		}
-		
-		
+
+
 		if (AutoRWLoad)
 		{
 			OpenRWRecentFile(0);	//adelikat: TODO: This command should be called internally from the RamWatch dialog in order for it to be more portable
@@ -1164,10 +1224,10 @@ bool ALoad(const char *nameo, char* innerFilename, bool silent)
 	}
 	else
 	{
-		SetWindowText(hAppWnd, FCEU_NAME_AND_VERSION);	//adelikat: If game fails to load while a previous one was open, the previous would have been closed, so reflect that in the window caption
+		FCEUWinSetWindowTextUTF8(hAppWnd, FCEU_NAME_AND_VERSION);	//adelikat: If game fails to load while a previous one was open, the previous would have been closed, so reflect that in the window caption
 		return false;
 	}
-	
+
 	SetMainWindowText();
 	ParseGIInput(GameInfo);
 
@@ -1180,39 +1240,41 @@ bool ALoad(const char *nameo, char* innerFilename, bool silent)
 /// Shows an Open File dialog and opens the ROM if the user selects a ROM file.
 /// @param hParent Handle of the main window
 /// @param initialdir Directory that's pre-selected in the Open File dialog.
-void LoadNewGamey(HWND hParent, const char *initialdir)
+void LoadNewGamey(HWND hParent, const char* initialdir)
 {
-	const char filter[] = "All usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf,*.zip,*.rar,*.7z,*.gz)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf;*.zip;*.rar;*.7z;*.gz\0All non-compressed usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf\0All Files (*.*)\0*.*\0\0";
-	char nameo[2048];
+	const wchar_t filter[] = L"All usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf,*.zip,*.rar,*.7z,*.gz)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf;*.zip;*.rar;*.7z;*.gz\0All non-compressed usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf\0All Files (*.*)\0*.*\0\0";
+	wchar_t nameo[2048];
 
-	// Create the Open File dialog
-	OPENFILENAME ofn;
-	memset(&ofn,0,sizeof(ofn));
+	// Create the Open File dialog.  Use the W API so filenames never pass through
+	// the system ANSI codepage before being converted to FCEUX's internal UTF-8.
+	OPENFILENAMEW ofn;
+	memset(&ofn, 0, sizeof(ofn));
 
-	ofn.lStructSize=sizeof(ofn);
-	ofn.hInstance=fceu_hInstance;
-	ofn.lpstrTitle=FCEU_NAME" Open File...";
-	ofn.lpstrFilter=filter;
-	nameo[0]=0;
-	ofn.hwndOwner=hParent;
-	ofn.lpstrFile=nameo;
-	ofn.nMaxFile=256;
-	ofn.Flags=OFN_EXPLORER|OFN_FILEMUSTEXIST|OFN_HIDEREADONLY; //OFN_EXPLORER|OFN_ENABLETEMPLATE|OFN_ENABLEHOOK;
-	string stdinitdir = FCEU_GetPath(FCEUMKF_ROMS);
-	
-	if (initialdir)					//adelikat: If a directory is specified in the function parameter, it should take priority
-		ofn.lpstrInitialDir = initialdir;
-	else							//adelikat: Else just use the override, if no override it will default to 0 - last directory used.
-		ofn.lpstrInitialDir = stdinitdir.c_str();
-	
+	std::string titleUtf8 = std::string(FCEU_NAME) + " Open File...";
+	std::wstring titleW = FCEUWinStringToWide(titleUtf8);
+	std::string stdinitdir = FCEU_GetPath(FCEUMKF_ROMS);
+	std::wstring initdirW = FCEUWinStringToWide(initialdir ? initialdir : stdinitdir.c_str());
+
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hInstance = fceu_hInstance;
+	ofn.lpstrTitle = titleW.c_str();
+	ofn.lpstrFilter = filter;
+	nameo[0] = 0;
+	ofn.hwndOwner = hParent;
+	ofn.lpstrFile = nameo;
+	ofn.nMaxFile = sizeof(nameo) / sizeof(nameo[0]);
+	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY; //OFN_EXPLORER|OFN_ENABLETEMPLATE|OFN_ENABLEHOOK;
+	ofn.lpstrInitialDir = initdirW.empty() ? NULL : initdirW.c_str();
+
 	// Show the Open File dialog
-	if(GetOpenFileName(&ofn))
+	if (GetOpenFileNameW(&ofn))
 	{
-		ALoad(nameo);
+		std::string utf8Name = FCEUWinWideToUTF8(nameo);
+		ALoad(utf8Name.c_str());
 	}
 }
 
-void GetMouseData(uint32 (&md)[3])
+void GetMouseData(uint32(&md)[3])
 {
 	extern RECT bestfitRect;
 
@@ -1229,54 +1291,63 @@ void GetMouseData(uint32 (&md)[3])
 		if ((int)mousex <= bestfitRect.left)
 		{
 			md[0] = 0;
-		} else if ((int)mousex >= bestfitRect.right)
+		}
+		else if ((int)mousex >= bestfitRect.right)
 		{
 			md[0] = screen_width - 1;
-		} else
+		}
+		else
 		{
 			md[0] = screen_width * (mousex - bestfitRect.left) / (bestfitRect.right - bestfitRect.left);
 		}
 		if ((int)mousey <= bestfitRect.top)
 		{
 			md[1] = 0;
-		} else if ((int)mousey >= bestfitRect.bottom)
+		}
+		else if ((int)mousey >= bestfitRect.bottom)
 		{
 			md[1] = screen_height - 1;
-		} else
+		}
+		else
 		{
 			md[1] = screen_height * (mousey - bestfitRect.top) / (bestfitRect.bottom - bestfitRect.top);
 		}
-	} else
+	}
+	else
 	{
 		RECT client_rect;
 		GetClientRect(hAppWnd, &client_rect);
 		if ((int)mousex <= client_rect.left)
 		{
 			md[0] = 0;
-		} else if ((int)mousex >= client_rect.right)
+		}
+		else if ((int)mousex >= client_rect.right)
 		{
 			md[0] = screen_width - 1;
-		} else
+		}
+		else
 		{
 			md[0] = screen_width * (mousex - client_rect.left) / (client_rect.right - client_rect.left);
 		}
 		if ((int)mousey <= client_rect.top)
 		{
 			md[1] = 0;
-		} else if ((int)mousey >= client_rect.bottom)
+		}
+		else if ((int)mousey >= client_rect.bottom)
 		{
 			md[1] = screen_height - 1;
-		} else
+		}
+		else
 		{
 			md[1] = screen_height * (mousey - client_rect.top) / (client_rect.bottom - client_rect.top);
 		}
 	}
 	md[0] += VNSCLIP;
 	md[1] += FSettings.FirstSLine;
-	md[2] = ((mouseb & MK_LBUTTON) ? 1 : 0) | (( mouseb & MK_RBUTTON ) ? 2 : 0);
+	md[2] = ((mouseb & MK_LBUTTON) ? 1 : 0) | ((mouseb & MK_RBUTTON) ? 2 : 0);
 }
 
-void GetMouseRelative(int32 (&md)[3])
+void GetMouseRelative(int32(&md)[3])
 {
 	static int cx = -1;
 	static int cy = -1;
@@ -1302,7 +1373,7 @@ void GetMouseRelative(int32 (&md)[3])
 
 		if (constrain)
 		{
-			SetCursorPos(cx,cy);
+			SetCursorPos(cx, cy);
 		}
 		else
 		{
@@ -1310,34 +1381,34 @@ void GetMouseRelative(int32 (&md)[3])
 			cy = cursor.y;
 		}
 	}
-	
+
 	md[0] = dx;
 	md[1] = dy;
-	md[2] = ((mouseb & MK_LBUTTON) ? 1 : 0) | (( mouseb & MK_RBUTTON ) ? 2 : 0);
+	md[2] = ((mouseb & MK_LBUTTON) ? 1 : 0) | ((mouseb & MK_RBUTTON) ? 2 : 0);
 }
 
 void DumpSubtitles(HWND hWnd)
-{ 
-	const char filter[]="Subtitles files (*.srt)\0*.srt\0All Files (*.*)\0*.*\0\0";
+{
+	const char filter[] = "Subtitles files (*.srt)\0*.srt\0All Files (*.*)\0*.*\0\0";
 	char nameo[2048];
 
 	OPENFILENAME ofn;
 	memset(&ofn, 0, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = hWnd;
-	ofn.lpstrTitle="Save Subtitles as...";
+	ofn.lpstrTitle = "Save Subtitles as...";
 	ofn.lpstrFilter = filter;
 	strcpy(nameo, mass_replace(GetRomName(), "|", ".").c_str());
 	ofn.lpstrFile = nameo;
 	ofn.nMaxFile = 256;
-	ofn.Flags = OFN_EXPLORER|OFN_FILEMUSTEXIST|OFN_HIDEREADONLY;
+	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 	ofn.lpstrDefExt = "srt";
 
 	if (GetSaveFileName(&ofn))
 	{
-		FILE *srtfile;
+		FILE* srtfile;
 		srtfile = fopen(nameo, "w");
-		if (srtfile) 
+		if (srtfile)
 		{
 			extern std::vector<int> subtitleFrames;
 			extern std::vector<std::string> subtitleMessages;
@@ -1346,28 +1417,30 @@ void DumpSubtitles(HWND hWnd)
 
 			for (unsigned int i = 0; i < subtitleFrames.size(); i++)
 			{
-				fprintf(srtfile, "%u\n", i+1); // starts with 1, not 0
+				fprintf(srtfile, "%u\n", i + 1); // starts with 1, not 0
 				double seconds, ms, endseconds, endms;
-				seconds = subtitleFrames[i]/fps;
-				if (i+1 < subtitleFrames.size()) // there's another subtitle coming after this one
+				seconds = subtitleFrames[i] / fps;
+				if (i + 1 < subtitleFrames.size()) // there's another subtitle coming after this one
 				{
-					if (subtitleFrames[i+1]-subtitleFrames[i] < subduration*fps) // avoid two subtitles at the same time
+					if (subtitleFrames[i + 1] - subtitleFrames[i] < subduration * fps) // avoid two subtitles at the same time
 					{
-						endseconds = (subtitleFrames[i+1]-1)/fps; // frame x: subtitle1; frame x+1 subtitle2
-					} else {
-						endseconds = seconds+subduration;
+						endseconds = (subtitleFrames[i + 1] - 1) / fps; // frame x: subtitle1; frame x+1 subtitle2
 					}
-				} else {
-					endseconds = seconds+subduration;
+					else {
+						endseconds = seconds + subduration;
+					}
 				}
-				
+				else {
+					endseconds = seconds + subduration;
+				}
+
 				ms = modf(seconds, &seconds);
 				endms = modf(endseconds, &endseconds);
 				// this is just beyond ugly, don't show it to your kids
 				fprintf(srtfile,
-				"%02.0f:%02d:%02d,%03d --> %02.0f:%02d:%02d,%03d\n", // hh:mm:ss,ms --> hh:mm:ss,ms
-				floor(seconds/3600),	(int)floor(seconds/60   ) % 60, (int)floor(seconds)	% 60, (int)(ms*1000),
-				floor(endseconds/3600), (int)floor(endseconds/60) % 60, (int)floor(endseconds) % 60, (int)(endms*1000));
+					"%02.0f:%02d:%02d,%03d --> %02.0f:%02d:%02d,%03d\n", // hh:mm:ss,ms --> hh:mm:ss,ms
+					floor(seconds / 3600), (int)floor(seconds / 60) % 60, (int)floor(seconds) % 60, (int)(ms * 1000),
+					floor(endseconds / 3600), (int)floor(endseconds / 60) % 60, (int)floor(endseconds) % 60, (int)(endms * 1000));
 				fprintf(srtfile, "%s\n\n", subtitleMessages[i].c_str()); // new line for every subtitle
 			}
 			fclose(srtfile);
@@ -1380,7 +1453,7 @@ void DumpSubtitles(HWND hWnd)
 
 
 //Message loop of the main window
-LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
+LRESULT FAR PASCAL AppWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	MainhWnd = hWnd;
 	int whichContext = 0;
@@ -1388,21 +1461,21 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	RECT file_rect;
 	RECT help_rect;
 	int x = 0;
-	
+
 	char TempArray[2048];
 	PCOPYDATASTRUCT pcData;
 
-	switch(msg)
+	switch (msg)
 	{
 	case WM_COPYDATA:
 
-		pcData = (PCOPYDATASTRUCT) lParam;
+		pcData = (PCOPYDATASTRUCT)lParam;
 
-	    switch ( pcData->dwData )
-		{ 
-	    case 1: //cData.dwData = 1; (can use for other types as well)
-			if (!ALoad((LPSTR) ( (DATA *) (pcData->lpData) )-> strFilePath))
-				MessageBox(hWnd,"File from second instance failed to open", "Failed to open file", MB_OK);
+		switch (pcData->dwData)
+		{
+		case 1: //cData.dwData = 1; (can use for other types as well)
+			if (!ALoad((LPSTR)((DATA*)(pcData->lpData))->strFilePath))
+				MessageBox(hWnd, "File from second instance failed to open", "Failed to open file", MB_OK);
 			break;
 		}
 		break;
@@ -1414,9 +1487,10 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			extern void ToggleFullscreen();
 			ToggleFullscreen();
 			return 0;
-		} else
+		}
+		else
 		{
-			mouseb=wParam;
+			mouseb = wParam;
 			goto proco;
 		}
 		break;
@@ -1425,7 +1499,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	case WM_LBUTTONDOWN:
 	case WM_LBUTTONUP:
 	case WM_RBUTTONDOWN:
-		mouseb=wParam;
+		mouseb = wParam;
 		goto proco;
 
 	case WM_MOUSEWHEEL:
@@ -1453,46 +1527,47 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				//If There is a movie loaded
 				int whichContext = GetCurrentContextIndex();
 
-				hfceuxcontext = LoadMenu(fceu_hInstance,"FCEUCONTEXTMENUS");
+				hfceuxcontext = LoadMenu(fceu_hInstance, "FCEUCONTEXTMENUS");
 				hfceuxcontextsub = GetSubMenu(hfceuxcontext, whichContext);
 				UpdateContextMenuItems(hfceuxcontextsub, whichContext);
 				UpdateMenuHotkeys(whichContext);
 				pt.x = LOWORD(lParam);		//Get mouse x in terms of client area
 				pt.y = HIWORD(lParam);		//Get mouse y in terms of client area
-				ClientToScreen(hAppWnd, (LPPOINT) &pt);	//Convert client area x,y to screen x,y
-				TrackPopupMenu(hfceuxcontextsub,TPM_RIGHTBUTTON,(pt.x),(pt.y),0,hWnd,0);	//Create menu
-			} else
+				ClientToScreen(hAppWnd, (LPPOINT)&pt);	//Convert client area x,y to screen x,y
+				TrackPopupMenu(hfceuxcontextsub, TPM_RIGHTBUTTON, (pt.x), (pt.y), 0, hWnd, 0);	//Create menu
+			}
+			else
 			{
-				mouseb=wParam;
+				mouseb = wParam;
 			}
 		}
 		goto proco;
 	}
 
-	case WM_MOVE: 
+	case WM_MOVE:
 	{
 		if (!IsIconic(hWnd)) {
-		RECT wrect;
-		GetWindowRect(hWnd,&wrect);
-		MainWindow_wndx = wrect.left;
-		MainWindow_wndy = wrect.top;
+			RECT wrect;
+			GetWindowRect(hWnd, &wrect);
+			MainWindow_wndx = wrect.left;
+			MainWindow_wndy = wrect.top;
 
-		#ifdef WIN32
-		WindowBoundsCheckNoResize(MainWindow_wndx,MainWindow_wndy,wrect.right);
-		#endif
+#ifdef WIN32
+			WindowBoundsCheckNoResize(MainWindow_wndx, MainWindow_wndy, wrect.right);
+#endif
 		}
 		goto proco;
 	}
 
 	case WM_MOUSEMOVE:
 	{
-		mousex=LOWORD(lParam);
-		mousey=HIWORD(lParam);
+		mousex = LOWORD(lParam);
+		mousey = HIWORD(lParam);
 		goto proco;
 	}
 
 	case WM_ERASEBKGND:
-		if(xbsave)
+		if (xbsave)
 			return(0);
 		else
 			goto proco;
@@ -1502,9 +1577,9 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		{
 			InvalidateRect(hWnd, NULL, false);		// AnS: HACK in order to force the entire client area to be redrawn; this fixes the bug with DIRECTDRAWCLIPPER sometimes calculating wrong region
 			PAINTSTRUCT ps;
-			BeginPaint(hWnd,&ps);
+			BeginPaint(hWnd, &ps);
 			FCEUD_BlitScreen(xbsave);
-			EndPaint(hWnd,&ps);
+			EndPaint(hWnd, &ps);
 			return(0);
 		}
 		goto proco;
@@ -1514,15 +1589,15 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			nofocus = 1;
 		else if (!fullscreen && !changerecursive && !windowedfailed)
 		{
-			switch(wParam)
+			switch (wParam)
 			{
-			case SIZE_MAXIMIZED: 
+			case SIZE_MAXIMIZED:
 				ismaximized = 1;
 				changerecursive = 1;
 				SetMainWindowStuff();
 				changerecursive = 0;
 				break;
-			case SIZE_RESTORED: 
+			case SIZE_RESTORED:
 				ismaximized = 0;
 				changerecursive = 1;
 				SetMainWindowStuff();
@@ -1532,224 +1607,201 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 		}
 		break;
 	case WM_SIZING:
-		{
-			RECT *wrect=(RECT *)lParam;
-			RECT srect;
+	{
+		RECT* wrect = (RECT*)lParam;
+		RECT srect;
 
-			int h=wrect->bottom-wrect->top;
-			int w=wrect->right-wrect->left;
-			int how = 0;
+		int h = wrect->bottom - wrect->top;
+		int w = wrect->right - wrect->left;
+		int how = 0;
 
-			if(wParam == WMSZ_BOTTOM || wParam == WMSZ_TOP)
-				how = 2;
-			else if(wParam == WMSZ_LEFT || wParam == WMSZ_RIGHT)
-				how = 1;
-			else if(wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_BOTTOMRIGHT
-				|| wParam == WMSZ_TOPRIGHT || wParam == WMSZ_TOPLEFT)
-				how = 3;
-			if(how & 1)
-				winsizemulx*= (double)w/winwidth;
-			if(how & 2)
-				winsizemuly*= (double)h/winheight;
+		if (wParam == WMSZ_BOTTOM || wParam == WMSZ_TOP)
+			how = 2;
+		else if (wParam == WMSZ_LEFT || wParam == WMSZ_RIGHT)
+			how = 1;
+		else if (wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_BOTTOMRIGHT
+			|| wParam == WMSZ_TOPRIGHT || wParam == WMSZ_TOPLEFT)
+			how = 3;
+		if (how & 1)
+			winsizemulx *= (double)w / winwidth;
+		if (how & 2)
+			winsizemuly *= (double)h / winheight;
 
-			bool shift_held = (GetAsyncKeyState(VK_SHIFT) < 0);
-			if(how & 1)
-				FixWXY(0, shift_held);
-			else
-				FixWXY(1, shift_held);
+		bool shift_held = (GetAsyncKeyState(VK_SHIFT) < 0);
+		if (how & 1)
+			FixWXY(0, shift_held);
+		else
+			FixWXY(1, shift_held);
 
-			CalcWindowSize(&srect);
-			winwidth=srect.right;
-			winheight=srect.bottom;
-			wrect->right = wrect->left + srect.right;
-			wrect->bottom = wrect->top + srect.bottom;
-		
-			GetMenuItemRect(hWnd, fceumenu, 0, &file_rect);
-			GetMenuItemRect(hWnd, fceumenu, 5, &help_rect);
-			menuYoffset = help_rect.top-file_rect.top;
-		}
-		//sizchange=1;
-		//break;
-		goto proco;
+		CalcWindowSize(&srect);
+		winwidth = srect.right;
+		winheight = srect.bottom;
+		wrect->right = wrect->left + srect.right;
+		wrect->bottom = wrect->top + srect.bottom;
+
+		GetMenuItemRect(hWnd, fceumenu, 0, &file_rect);
+		GetMenuItemRect(hWnd, fceumenu, 5, &help_rect);
+		menuYoffset = help_rect.top - file_rect.top;
+	}
+	//sizchange=1;
+	//break;
+	goto proco;
 	case WM_DISPLAYCHANGE:
-		if(!fullscreen && !changerecursive)
-			vchanged=1;
+		if (!fullscreen && !changerecursive)
+			vchanged = 1;
 		goto proco;
 	case WM_DROPFILES:
+	{
+		UINT len = DragQueryFileW((HDROP)wParam, 0, NULL, 0) + 1;
+		wchar_t* wtmp = new wchar_t[len];
 		{
-			UINT len;
+			DragQueryFileW((HDROP)wParam, 0, wtmp, len);
+			std::string fileDropped = FCEUWinWideToUTF8(wtmp);
+			delete[] wtmp;
+			//adelikat:  Drag and Drop only checks file extension, the internal functions are responsible for file error checking
 
-			/*
-			 Using DragQueryFileW() and wcstombs() is not a proper way to convert Unicode string
-			 to a multibyte one, the system has its own codepage but wcstombs seems ignores it and only
-			 convert it to UTF-8. Similarly, functions such named FCEUD_UTF8fopen() acturally perform ANSI
-			 behaviour which follows the codepage of the system rather than UTF-8. I knew Windows with some
-			 languages has a very narrow codepage like 1252 and may have a problem to load a filename
-			 which contains extra characters without its convert, but the wcstombs() may corrupt the string
-			 to garbage text to the title and menu in some multibyte language Windows systems, it's due to
-			 the limitation of ANSI application and system itself, not the fault of the emulator, so there's
-			 no responsibility for the emulator to use a different API to solve it, just leave it as the
-			 default definition.
-			*/
-			len = DragQueryFile((HDROP)wParam, 0, 0, 0) + 1;
-			char* ftmp = new char[len];
+			//-------------------------------------------------------
+			//Check if a cheats (.cht) file
+			//-------------------------------------------------------
+			if (!(fileDropped.find(".cht") == string::npos) && (fileDropped.find(".cht") == fileDropped.length() - 4))
 			{
-				DragQueryFile((HDROP)wParam,0,ftmp,len); 
-				// std::string fileDropped = wcstombs(wftmp);
-				std::string fileDropped = ftmp;
-				delete[] ftmp;
-				//adelikat:  Drag and Drop only checks file extension, the internal functions are responsible for file error checking
-				
-				//-------------------------------------------------------
-				//Check if a cheats (.cht) file
-				//-------------------------------------------------------
-				if (!(fileDropped.find(".cht") == string::npos) && (fileDropped.find(".cht") == fileDropped.length()-4))
-				{
-					FILE* file = FCEUD_UTF8fopen(fileDropped.c_str(),"rb");
-					FCEU_LoadGameCheats(file);
-				}
-				
-				//-------------------------------------------------------
-				//Check if .fcm file, if so, convert it and play the resulting .fm2
-				//-------------------------------------------------------
-				else if (!(fileDropped.find(".fcm") == string::npos) && (fileDropped.find(".fcm") == fileDropped.length()-4))
-				{
-					//produce output filename
-					std::string outname;
-					size_t dot = fileDropped.find_last_of(".");
-					if(dot == std::string::npos)
-						outname = fileDropped + ".fm2";
-					else
-						outname = fileDropped.substr(0,dot) + ".fm2";
+				FILE* file = FCEUD_UTF8fopen(fileDropped.c_str(), "rb");
+				FCEU_LoadGameCheats(file);
+			}
 
-					MovieData md;
-					EFCM_CONVERTRESULT result = convert_fcm(md, fileDropped.c_str());
-					if(result==FCM_CONVERTRESULT_SUCCESS)
-					{
-						EMUFILE* outf = FCEUD_UTF8_fstream(outname, "wb");
-						md.dump(outf,false);
-						delete outf;
-						if (!GameInfo)				//If no game is loaded, load the Open Game dialog
-							LoadNewGamey(hWnd, 0);
-						FCEUI_LoadMovie(outname.c_str(), 1, false);
-						FCEUX_LoadMovieExtras(outname.c_str());
-					} else
-					{
-						std::string msg = "Failure converting " + fileDropped + "\r\n\r\n" + EFCM_CONVERTRESULT_message(result);
-						MessageBox(hWnd,msg.c_str(),"Failure converting fcm", 0);
-					}
-				}
+			//-------------------------------------------------------
+			//Check if .fcm file, if so, convert it and play the resulting .fm2
+			//-------------------------------------------------------
+			else if (!(fileDropped.find(".fcm") == string::npos) && (fileDropped.find(".fcm") == fileDropped.length() - 4))
+			{
+				//produce output filename
+				std::string outname;
+				size_t dot = fileDropped.find_last_of(".");
+				if (dot == std::string::npos)
+					outname = fileDropped + ".fm2";
+				else
+					outname = fileDropped.substr(0, dot) + ".fm2";
 
-				//-------------------------------------------------------
-				//Check if Palette file
-				//-------------------------------------------------------
-				else if (!(fileDropped.find(".pal") == string::npos) && (fileDropped.find(".pal") == fileDropped.length()-4))
+				MovieData md;
+				EFCM_CONVERTRESULT result = convert_fcm(md, fileDropped.c_str());
+				if (result == FCM_CONVERTRESULT_SUCCESS)
 				{
-					SetPalette(fileDropped.c_str());	
-				}
-
-				//-------------------------------------------------------
-				//Check if Movie file
-				//-------------------------------------------------------
-				else if (!(fileDropped.find(".fm2") == string::npos) && (fileDropped.find(".fm2") == fileDropped.length()-4))	 //ROM is already loaded and .fm2 in filename
-				{
+					EMUFILE* outf = FCEUD_UTF8_fstream(outname, "wb");
+					md.dump(outf, false);
+					delete outf;
 					if (!GameInfo)				//If no game is loaded, load the Open Game dialog
 						LoadNewGamey(hWnd, 0);
-					if (GameInfo && !(fileDropped.find(".fm2") == string::npos))
-					{
-						//.fm2 is at the end of the filename so that must be the extension		
-						FCEUI_LoadMovie(fileDropped.c_str(), 1, false);		 //We are convinced it is a movie file, attempt to load it
-						FCEUX_LoadMovieExtras(fileDropped.c_str());
-					}
+					FCEUI_LoadMovie(outname.c_str(), 1, false);
+					FCEUX_LoadMovieExtras(outname.c_str());
 				}
-				//-------------------------------------------------------
-				//Check if TAS Editor project file
-				//-------------------------------------------------------
-				else if (!(fileDropped.find(".fm3") == string::npos) && (fileDropped.find(".fm3") == fileDropped.length()-4))	 //ROM is already loaded and .fm3 in filename
-				{
-					if (!GameInfo)				//If no game is loaded, load the Open Game dialog
-						LoadNewGamey(hWnd, 0);
-					if (GameInfo && !(fileDropped.find(".fm3") == string::npos))
-					{
-						//.fm3 is at the end of the filename so that must be the extension
-						extern bool enterTASEditor();
-						extern bool loadProject(const char* fullname);
-						extern bool askToSaveProject();
-						if (enterTASEditor())					//We are convinced it is a TAS Editor project file, attempt to load in TAS Editor
-							if (askToSaveProject())		// in case there's unsaved project
-								loadProject(fileDropped.c_str());
-					}
-				}
-				//-------------------------------------------------------
-				//Check if Savestate file
-				//-------------------------------------------------------
-				else if (!(fileDropped.find(".fc") == string::npos))
-				{
-					if (fileDropped.find(".fc") == fileDropped.length()-4)	//Check to see it is both at the end (file extension) and there is on more character
-					{
-						if (fileDropped[fileDropped.length()-1] >= '0' && fileDropped[fileDropped.length()-1] <= '9')	//If last character is 0-9 (making .fc0 - .fc9)
-						{
-							FCEUI_LoadState(fileDropped.c_str());
-						}
-					}
-				}
-				//-------------------------------------------------------
-				//Check if Lua file
-				//-------------------------------------------------------
-#ifdef _S9XLUA_H
-				else if (!(fileDropped.find(".lua") == string::npos) && (fileDropped.find(".lua") == fileDropped.length()-4))	
-				{
-					// HACK because luaL_loadfile doesn't work with multibyte paths
-					char *ftmp;
-					len = DragQueryFile((HDROP)wParam, 0, 0, 0) + 1; 
-					if ((ftmp=(char*)malloc(len))) 
-					{
-						DragQueryFile((HDROP)wParam, 0, ftmp, len); 
-						fileDropped = ftmp;
-						free(ftmp);
-					}
-					FCEU_LoadLuaCode(fileDropped.c_str());
-					UpdateLuaConsole(fileDropped.c_str());
-				}
-#endif
-				//-------------------------------------------------------
-				//Check if Ram Watch file
-				//-------------------------------------------------------
-				else if (!(fileDropped.find(".wch") == string::npos) && (fileDropped.find(".wch") == fileDropped.length()-4)) {
-					if (GameInfo) {
-						SendMessage(hWnd, WM_COMMAND, (WPARAM)ID_RAM_WATCH,(LPARAM)(NULL));
-						Load_Watches(true, fileDropped.c_str());
-					}
-				}
-				//-------------------------------------------------------
-				//If not a movie, Load it as a ROM file
-				//-------------------------------------------------------
 				else
 				{
-					ALoad(fileDropped.c_str());
-				}	
+					std::string msg = "Failure converting " + fileDropped + "\r\n\r\n" + EFCM_CONVERTRESULT_message(result);
+					MessageBox(hWnd, msg.c_str(), "Failure converting fcm", 0);
+				}
+			}
+
+			//-------------------------------------------------------
+			//Check if Palette file
+			//-------------------------------------------------------
+			else if (!(fileDropped.find(".pal") == string::npos) && (fileDropped.find(".pal") == fileDropped.length() - 4))
+			{
+				SetPalette(fileDropped.c_str());
+			}
+
+			//-------------------------------------------------------
+			//Check if Movie file
+			//-------------------------------------------------------
+			else if (!(fileDropped.find(".fm2") == string::npos) && (fileDropped.find(".fm2") == fileDropped.length() - 4))	 //ROM is already loaded and .fm2 in filename
+			{
+				if (!GameInfo)				//If no game is loaded, load the Open Game dialog
+					LoadNewGamey(hWnd, 0);
+				if (GameInfo && !(fileDropped.find(".fm2") == string::npos))
+				{
+					//.fm2 is at the end of the filename so that must be the extension		
+					FCEUI_LoadMovie(fileDropped.c_str(), 1, false);		 //We are convinced it is a movie file, attempt to load it
+					FCEUX_LoadMovieExtras(fileDropped.c_str());
+				}
+			}
+			//-------------------------------------------------------
+			//Check if TAS Editor project file
+			//-------------------------------------------------------
+			else if (!(fileDropped.find(".fm3") == string::npos) && (fileDropped.find(".fm3") == fileDropped.length() - 4))	 //ROM is already loaded and .fm3 in filename
+			{
+				if (!GameInfo)				//If no game is loaded, load the Open Game dialog
+					LoadNewGamey(hWnd, 0);
+				if (GameInfo && !(fileDropped.find(".fm3") == string::npos))
+				{
+					//.fm3 is at the end of the filename so that must be the extension
+					extern bool enterTASEditor();
+					extern bool loadProject(const char* fullname);
+					extern bool askToSaveProject();
+					if (enterTASEditor())					//We are convinced it is a TAS Editor project file, attempt to load in TAS Editor
+						if (askToSaveProject())		// in case there's unsaved project
+							loadProject(fileDropped.c_str());
+				}
+			}
+			//-------------------------------------------------------
+			//Check if Savestate file
+			//-------------------------------------------------------
+			else if (!(fileDropped.find(".fc") == string::npos))
+			{
+				if (fileDropped.find(".fc") == fileDropped.length() - 4)	//Check to see it is both at the end (file extension) and there is on more character
+				{
+					if (fileDropped[fileDropped.length() - 1] >= '0' && fileDropped[fileDropped.length() - 1] <= '9')	//If last character is 0-9 (making .fc0 - .fc9)
+					{
+						FCEUI_LoadState(fileDropped.c_str());
+					}
+				}
+			}
+			//-------------------------------------------------------
+			//Check if Lua file
+			//-------------------------------------------------------
+#ifdef _S9XLUA_H
+			else if (!(fileDropped.find(".lua") == string::npos) && (fileDropped.find(".lua") == fileDropped.length() - 4))
+			{
+				FCEU_LoadLuaCode(fileDropped.c_str());
+				UpdateLuaConsole(fileDropped.c_str());
+			}
+#endif
+			//-------------------------------------------------------
+			//Check if Ram Watch file
+			//-------------------------------------------------------
+			else if (!(fileDropped.find(".wch") == string::npos) && (fileDropped.find(".wch") == fileDropped.length() - 4)) {
+				if (GameInfo) {
+					SendMessage(hWnd, WM_COMMAND, (WPARAM)ID_RAM_WATCH, (LPARAM)(NULL));
+					Load_Watches(true, fileDropped.c_str());
+				}
+			}
+			//-------------------------------------------------------
+			//If not a movie, Load it as a ROM file
+			//-------------------------------------------------------
+			else
+			{
+				ALoad(fileDropped.c_str());
 			}
 		}
-		break;
+	}
+	break;
 
 	case WM_COMMAND:
 
-		if(HIWORD(wParam) == 0 || HIWORD(wParam) == 1)
+		if (HIWORD(wParam) == 0 || HIWORD(wParam) == 1)
 		{
 			wParam &= 0xFFFF;
 
 			// A menu item from the recent files menu was clicked.
-			if(wParam >= MENU_FIRST_RECENT_FILE && wParam < MENU_FIRST_RECENT_FILE + MAX_NUMBER_OF_RECENT_FILES)
+			if (wParam >= MENU_FIRST_RECENT_FILE && wParam < MENU_FIRST_RECENT_FILE + MAX_NUMBER_OF_RECENT_FILES)
 			{
 				LoadRecentRom(wParam - MENU_FIRST_RECENT_FILE);
 			}
-			
+
 			// A menu item for the recent lua files menu was clicked.
-			#ifdef _S9XLUA_H
-			if(wParam >= LUA_FIRST_RECENT_FILE && wParam < LUA_FIRST_RECENT_FILE + MAX_NUMBER_OF_LUA_RECENT_FILES)
+#ifdef _S9XLUA_H
+			if (wParam >= LUA_FIRST_RECENT_FILE && wParam < LUA_FIRST_RECENT_FILE + MAX_NUMBER_OF_LUA_RECENT_FILES)
 			{
 				char*& fname = recent_lua[wParam - LUA_FIRST_RECENT_FILE];
-				if(fname)
+				if (fname)
 				{
 					UpdateLuaConsole(fname);
 					if (!FCEU_LoadLuaCode(fname))
@@ -1764,34 +1816,35 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 					}
 				}
 			}
-			#endif
+#endif
 
 			// A menu item for the recent movie files menu was clicked.
-			if(wParam >= MOVIE_FIRST_RECENT_FILE && wParam < MOVIE_FIRST_RECENT_FILE + MAX_NUMBER_OF_MOVIE_RECENT_FILES)
+			if (wParam >= MOVIE_FIRST_RECENT_FILE && wParam < MOVIE_FIRST_RECENT_FILE + MAX_NUMBER_OF_MOVIE_RECENT_FILES)
 			{
 				// aquanull: FCEUI_LoadMovie() calls AddRecentMovieFile(), which may change the orders of recent movies.
 				// For FCEUX_LoadMovieExtras() to receive the correct filename, fname has to be unaffected.
 				char*& fname = recent_movie[wParam - MOVIE_FIRST_RECENT_FILE];
-				if(fname)
+				if (fname)
 				{
 					string movie_fname = fname;
 					if (!FCEUI_LoadMovie(fname, 1, false))
 					{
-						int result = MessageBox(hWnd,"Remove from list?", "Could Not Open Recent File", MB_YESNO);
+						int result = MessageBox(hWnd, "Remove from list?", "Could Not Open Recent File", MB_YESNO);
 						if (result == IDYES)
 						{
 							RemoveRecentItem((wParam - MOVIE_FIRST_RECENT_FILE), recent_movie, MAX_NUMBER_OF_MOVIE_RECENT_FILES);
 							UpdateMovieRMenu(recentmoviemenu, recent_movie, MENU_MOVIE_RECENT, MOVIE_FIRST_RECENT_FILE);
 						}
-					} else {
+					}
+					else {
 						FCEUX_LoadMovieExtras(movie_fname.c_str());
 					}
 				}
 			}
 
-			switch(LOWORD(wParam))
+			switch (LOWORD(wParam))
 			{
-			//File Menu-------------------------------------------------------------
+				//File Menu-------------------------------------------------------------
 			case FCEU_CONTEXT_OPENROM:
 			case MENU_OPEN_FILE:
 				LoadNewGamey(hWnd, 0);
@@ -1800,7 +1853,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			case MENU_CLOSE_FILE:
 				CloseGame();
 				break;
-			//Savestate Submenu
+				//Savestate Submenu
 			case MENU_SAVESTATE:	//Save State
 				FCEUI_SaveState(0);
 				break;
@@ -1823,7 +1876,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				FCEUI_SelectState(CurrentState, 1);
 				break;
 
-			//Movie submenu
+				//Movie submenu
 			case FCEUX_CONTEXT_RECORDMOVIE:
 			case MENU_RECORD_MOVIE:
 				FCEUD_MovieRecordTo();
@@ -1880,17 +1933,17 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				FCEUI_MovieRecordModeInsert();
 				break;
 
-			//Record Avi/Wav submenu
+				//Record Avi/Wav submenu
 			case MENU_RECORD_AVI:
 				FCEUD_AviRecordTo();
 				break;
 			case MENU_STOP_AVI:
 				FCEUD_AviStop();
 				break;
-			case MENU_RECORD_WAV: 
+			case MENU_RECORD_WAV:
 				loggingSound = CreateSoundSave();
 				break;
-			case MENU_STOP_WAV: 
+			case MENU_STOP_WAV:
 				CloseWave();
 				loggingSound = false;
 				break;
@@ -1910,18 +1963,19 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			}
 			case FCEUX_CONTEXT_SCREENSHOT:
 			case ID_FILE_SCREENSHOT:
-				FCEUI_SaveSnapshot(); 
+				FCEUI_SaveSnapshot();
 				break;
 			case ID_FILE_SAVESCREENSHOTAS:
 				SaveSnapshotAs();
 				break;
 
-			//Lua submenu
+				//Lua submenu
 			case ID_FILE_OPENLUAWINDOW:
 				if (!LuaConsoleHWnd)
 				{
 					LuaConsoleHWnd = CreateDialog(fceu_hInstance, MAKEINTRESOURCE(IDD_LUA), hWnd, DlgLuaScriptDialog);
-				} else
+				}
+				else
 				{
 					ShowWindow(LuaConsoleHWnd, SW_SHOWNORMAL);
 					SetForegroundWindow(LuaConsoleHWnd);
@@ -1929,15 +1983,15 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				break;
 			case FCEUX_CONTEXT_CLOSELUAWINDOWS:
 			case ID_FILE_CLOSELUAWINDOWS:
-				if(LuaConsoleHWnd)
+				if (LuaConsoleHWnd)
 					PostMessage(LuaConsoleHWnd, WM_CLOSE, 0, 0);
 				break;
-			//Recent Lua 1
-			#ifdef _S9XLUA_H
+				//Recent Lua 1
+#ifdef _S9XLUA_H
 			case FCEUX_CONTEXT_LOADLASTLUA:
 				ShowWindow(LuaConsoleHWnd, SW_SHOWNORMAL);
 				SetForegroundWindow(LuaConsoleHWnd);
-				if(recent_lua[0])
+				if (recent_lua[0])
 				{
 					if (!FCEU_LoadLuaCode(recent_lua[0]))
 					{
@@ -1951,13 +2005,13 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 					}
 				}
 				break;
-			#endif
+#endif
 
 			case MENU_EXIT:
 				DoFCEUExit();
 				break;
 
-			//NES Menu--------------------------------------------------------------
+				//NES Menu--------------------------------------------------------------
 			case MENU_RESET:
 				FCEUI_ResetNES();
 				break;
@@ -1984,12 +2038,12 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				if ((CWin32InputBox::GetString("Input Barcode", "Input full 13- or 8-digit barcode to be directly send to the reader. Or input partial 12- or 7-digit number to allow the program to calculate control code automatically.", bbuf, hWnd) == IDOK)) {
 					uint32 stl = strlen(bbuf);
 					if (InputType[2] == SIFC_BWORLD) {
-						strcpy((char *)&BWorldData[1], (char *)bbuf);
+						strcpy((char*)&BWorldData[1], (char*)bbuf);
 						BWorldData[0] = 1;
 						FCEU_DispMessage("Barcode entered: %s", 0, bbuf);
 					}
 					else {
-						if(FCEUI_DatachSet((uint8 *)bbuf) == 1)
+						if (FCEUI_DatachSet((uint8*)bbuf) == 1)
 							FCEU_DispMessage("Barcode entered: %s", 0, bbuf);
 						else
 							FCEU_DispMessage("Invalid barcode size or characters!", 0);
@@ -1997,7 +2051,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				}
 				break;
 
-			//Emulation submenu
+				//Emulation submenu
 			case ID_NES_PAUSE:
 				FCEUI_ToggleEmulationPause();
 				UpdateCheckedMenuItems();
@@ -2006,7 +2060,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				FCEUD_TurboToggle();
 				break;
 
-			//Emulation speed submenu
+				//Emulation speed submenu
 			case ID_NES_SPEEDUP:
 				FCEUD_SetEmulationSpeed(3);
 				break;
@@ -2038,7 +2092,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			{
 				extern int frameAdvance_Delay;
 				int new_value = frameAdvance_Delay;
-				if((CWin32InputBox::GetInteger("FrameAdvance Delay", "How much time should elapse before\nholding the Frame Advance\nunpauses emulation?", new_value, hWnd) == IDOK))
+				if ((CWin32InputBox::GetInteger("FrameAdvance Delay", "How much time should elapse before\nholding the Frame Advance\nunpauses emulation?", new_value, hWnd) == IDOK))
 				{
 					if (new_value < 0)
 						new_value = FRAMEADVANCE_DELAY_DEFAULT;
@@ -2057,7 +2111,8 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 					if (new_value > 0)
 					{
 						fps_scale_frameadvance = new_value * 2.56 + 1;
-					} else
+					}
+					else
 					{
 						fps_scale_frameadvance = 0;
 						fps_scale = fps_scale_unpaused;
@@ -2074,19 +2129,19 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				break;
 			case MENU_RUN_IN_BACKGROUND:
 				eoptions ^= EO_BGRUN;
-				if((eoptions & EO_BGRUN) == 0)
+				if ((eoptions & EO_BGRUN) == 0)
 				{
 					EnableBackgroundInput = 0;
-					KeyboardSetBackgroundAccess(EnableBackgroundInput!=0);
-					JoystickSetBackgroundAccess(EnableBackgroundInput!=0);
+					KeyboardSetBackgroundAccess(EnableBackgroundInput != 0);
+					JoystickSetBackgroundAccess(EnableBackgroundInput != 0);
 				}
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_BACKGROUND_INPUT:
 				EnableBackgroundInput ^= 1;
 				eoptions |= EO_BGRUN * EnableBackgroundInput;
-				KeyboardSetBackgroundAccess(EnableBackgroundInput!=0);
-				JoystickSetBackgroundAccess(EnableBackgroundInput!=0);
+				KeyboardSetBackgroundAccess(EnableBackgroundInput != 0);
+				JoystickSetBackgroundAccess(EnableBackgroundInput != 0);
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_ENABLE_AUTOSAVE:
@@ -2098,19 +2153,19 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				UpdateCheckedMenuItems();
 				break;
 			case ID_ENABLE_BACKUPSAVESTATES:
-				backupSavestates ^=1;
+				backupSavestates ^= 1;
 				UpdateCheckedMenuItems();
 				break;
 			case ID_ENABLE_COMPRESSSAVESTATES:
-				compressSavestates ^=1;
+				compressSavestates ^= 1;
 				UpdateCheckedMenuItems();
 				break;
 			case ID_ENABLE_AUTORESUME:
-				AutoResumePlay ^=1;
+				AutoResumePlay ^= 1;
 				UpdateCheckedMenuItems();
 				break;
 
-			//Display submenu
+				//Display submenu
 			case MENU_INPUTDISPLAY_0: //Input display off
 				input_display = 0;
 				UpdateCheckedMenuItems();
@@ -2151,19 +2206,19 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				break;
 			case MENU_DISPLAY_BG:
 			case MENU_DISPLAY_OBJ:
-				{
-					bool spr, bg;
-					FCEUI_GetRenderPlanes(spr,bg);
-					if(LOWORD(wParam)==MENU_DISPLAY_BG)
-						bg = !bg;
-					else
-						spr = !spr;
-					FCEUI_SetRenderPlanes(spr,bg);
-				}
-				break;
+			{
+				bool spr, bg;
+				FCEUI_GetRenderPlanes(spr, bg);
+				if (LOWORD(wParam) == MENU_DISPLAY_BG)
+					bg = !bg;
+				else
+					spr = !spr;
+				FCEUI_SetRenderPlanes(spr, bg);
+			}
+			break;
 
 			case ID_NEWPPU:
-				if(overclock_enabled &&
+				if (overclock_enabled &&
 					MessageBox(hWnd, "The new PPU doesn't support overclocking, it will be disabled. Do you want to continue?", "Overclocking", MB_ICONQUESTION | MB_YESNO) == IDNO)
 					break;
 			case ID_OLDPPU:
@@ -2171,7 +2226,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				break;
 			case MENU_GAME_GENIE:
 				genie ^= 1;
-				FCEUI_SetGameGenie(genie!=0);
+				FCEUI_SetGameGenie(genie != 0);
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_NTSC:
@@ -2222,12 +2277,12 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				break;
 
 			case ID_CONFIG_SAVECONFIGFILE:
-				{
-					extern string cfgFile;
-					sprintf(TempArray, "%s/%s", BaseDirectory.c_str(),cfgFile.c_str());
-					SaveConfig(TempArray);
-					break;
-				}
+			{
+				extern string cfgFile;
+				sprintf(TempArray, "%s/%s", BaseDirectory.c_str(), cfgFile.c_str());
+				SaveConfig(TempArray);
+				break;
+			}
 
 			//Tools Menu---------------------------------------------------------------
 			case MENU_CHEATS:
@@ -2236,12 +2291,13 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			case MENU_MEMORY_WATCH:
 				CreateMemWatch();
 				break;
-			
+
 			case ID_RAM_SEARCH:
-				if(!RamSearchHWnd)
+				if (!RamSearchHWnd)
 				{
 					OpenRamSearch();
-				} else
+				}
+				else
 				{
 					ShowWindow(RamSearchHWnd, SW_SHOWNORMAL);
 					SetForegroundWindow(RamSearchHWnd);
@@ -2249,17 +2305,17 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				break;
 
 			case ID_RAM_WATCH:
-				if(!RamWatchHWnd)
+				if (!RamWatchHWnd)
 				{
 					OpenRamWatch();
 				}
 				else
 					SetForegroundWindow(RamWatchHWnd);
-				break;	
-			//case MENU_RAMFILTER:
-			//	DoByteMonitor(); 
-			//	break;
-			//  Removing this tool since it is redundant to both 
+				break;
+				//case MENU_RAMFILTER:
+				//	DoByteMonitor(); 
+				//	break;
+				//  Removing this tool since it is redundant to both 
 			case MENU_TASEDITOR:
 				extern bool enterTASEditor();
 				enterTASEditor();
@@ -2268,83 +2324,83 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				ConvertFCM(hWnd);
 				break;
 
-			//AutoFire Pattern submenu
+				//AutoFire Pattern submenu
 			case MENU_AUTOFIRE_PATTERN_1:
-				SetAutoFirePattern(1,1);
+				SetAutoFirePattern(1, 1);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_2:
-				SetAutoFirePattern(1,2);
+				SetAutoFirePattern(1, 2);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_3:
-				SetAutoFirePattern(1,3);
+				SetAutoFirePattern(1, 3);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_4:
-				SetAutoFirePattern(1,4);
+				SetAutoFirePattern(1, 4);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_5:
-				SetAutoFirePattern(1,5);
+				SetAutoFirePattern(1, 5);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_6:
-				SetAutoFirePattern(2,1);
+				SetAutoFirePattern(2, 1);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_7:
-				SetAutoFirePattern(2,2);
+				SetAutoFirePattern(2, 2);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_8:
-				SetAutoFirePattern(2,3);
+				SetAutoFirePattern(2, 3);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_9:
-				SetAutoFirePattern(2,4);
+				SetAutoFirePattern(2, 4);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_10:
-				SetAutoFirePattern(3,1);
+				SetAutoFirePattern(3, 1);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_11:
-				SetAutoFirePattern(3,2);
+				SetAutoFirePattern(3, 2);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_12:
-				SetAutoFirePattern(3,3);
+				SetAutoFirePattern(3, 3);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_13:
-				SetAutoFirePattern(4,1);
+				SetAutoFirePattern(4, 1);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_14:
-				SetAutoFirePattern(4,2);
+				SetAutoFirePattern(4, 2);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_AUTOFIRE_PATTERN_15:
-				SetAutoFirePattern(5,1);
+				SetAutoFirePattern(5, 1);
 				CheckedAutoFirePattern = wParam;
 				UpdateCheckedMenuItems();
 				break;
-			//Autofire Offset submenu
+				//Autofire Offset submenu
 			case MENU_AUTOFIRE_OFFSET_1:
 			case MENU_AUTOFIRE_OFFSET_2:
 			case MENU_AUTOFIRE_OFFSET_3:
@@ -2356,14 +2412,14 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				UpdateCheckedMenuItems();
 				break;
 			case MENU_ALTERNATE_AB:
-				SetAutoFireDesynch(GetAutoFireDesynch()^1);
+				SetAutoFireDesynch(GetAutoFireDesynch() ^ 1);
 				UpdateCheckedMenuItems();
 				break;
 			case ID_TOOLS_TEXTHOOKER:
 				DoTextHooker();
 				break;
 
-			//Debug Menu-------------------------------------------------------------
+				//Debug Menu-------------------------------------------------------------
 			case MENU_DEBUGGER:
 				DoDebug(0);
 				break;
@@ -2388,7 +2444,7 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			case MENU_INESHEADEREDITOR:
 				DoHeadEdit();
 				break;
-			//Help Menu--------------------------------------------------------------
+				//Help Menu--------------------------------------------------------------
 			case MENU_HELP:
 				OpenHelpWindow();
 				break;
@@ -2398,16 +2454,16 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			case MENU_ABOUT:
 				ShowAboutBox();
 				break;
-			
-			//Context Menus------------------------------------------------------
-			
-			//Recent ROM 1
+
+				//Context Menus------------------------------------------------------
+
+				//Recent ROM 1
 			case FCEUX_CONTEXT_RECENTROM1:
-				if(recent_files[0])
+				if (recent_files[0])
 				{
-				if (!ALoad(recent_files[0]))
+					if (!ALoad(recent_files[0]))
 					{
-						int result = MessageBox(hWnd,"Remove from list?", "Could Not Open Recent File", MB_YESNO);
+						int result = MessageBox(hWnd, "Remove from list?", "Could Not Open Recent File", MB_YESNO);
 						if (result == IDYES)
 						{
 							RemoveRecentItem(0, recent_files, MAX_NUMBER_OF_RECENT_FILES);
@@ -2417,26 +2473,27 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				}
 				break;
 
-			//Recent Movie 1
+				//Recent Movie 1
 			case FCEUX_CONTEXT_LOADLASTMOVIE:
-				if(recent_movie[0])
+				if (recent_movie[0])
 				{
 					if (!FCEUI_LoadMovie(recent_movie[0], 1, false))
 					{
-						int result = MessageBox(hWnd,"Remove from list?", "Could Not Open Recent File", MB_YESNO);
+						int result = MessageBox(hWnd, "Remove from list?", "Could Not Open Recent File", MB_YESNO);
 						if (result == IDYES)
 						{
 							RemoveRecentItem(0, recent_movie, MAX_NUMBER_OF_MOVIE_RECENT_FILES);
 							UpdateMovieRMenu(recentmoviemenu, recent_movie, MENU_MOVIE_RECENT, MOVIE_FIRST_RECENT_FILE);
 						}
-					} else
+					}
+					else
 					{
 						FCEUX_LoadMovieExtras(recent_movie[0]);
 					}
 				}
 				break;
 
-			//Toggle subtitles
+				//Toggle subtitles
 			case FCEUX_CONTEXT_TOGGLESUBTITLES:
 				movieSubtitles ^= 1;
 				break;
@@ -2445,18 +2502,18 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 				DumpSubtitles(hWnd);
 				break;
 
-			//View comments and subtitles
+				//View comments and subtitles
 			case FCEUX_CONTEXT_VIEWCOMMENTSSUBTITLES:
 				CreateDialog(fceu_hInstance, "IDD_REPLAY_METADATA", hWnd, ReplayMetadataDialogProc);
 				break;
 
-			//Undo Savestate
+				//Undo Savestate
 			case FCEUX_CONTEXT_UNDOSAVESTATE:
 				if (undoSS || redoSS)
 					SwapSaveState();
 				break;
 
-			//Undo Loadstate
+				//Undo Loadstate
 			case FCEUX_CONTEXT_UNDOLOADSTATE:
 				if (CheckBackupSaveStateExist() && redoLS)
 					RedoLoadState();
@@ -2464,22 +2521,22 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 					LoadBackup();
 				break;
 
-			//Load last auto-save
+				//Load last auto-save
 			case FCEUX_CONTEXT_REWINDTOLASTAUTO:
 				FCEUI_RewindToLastAutosave();
 				break;
 
-			//Create a backup movie file
+				//Create a backup movie file
 			case FCEUX_CONTEXT_MAKEBACKUP:
 				FCEUI_MakeBackupMovie(true);
 				break;
 
-			//Create a backup based on user entering a filename
+				//Create a backup based on user entering a filename
 			case FCEUX_CONTEXT_SAVEMOVIEAS:
 				SaveMovieAs();
 				break;
 
-			//Game + Movie - Help
+				//Game + Movie - Help
 			case FCEU_CONTEXT_MOVIEHELP:
 				OpenHelpWindow(moviehelp);
 				break;
@@ -2487,75 +2544,75 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
 			case ID_CONTEXT_FULLSAVESTATES:
 				fullSaveStateLoads ^= 1;
 				break;
-			
-			//No Game - Help
+
+				//No Game - Help
 			case FCEU_CONTEXT_FCEUHELP:
 				OpenHelpWindow(gettingstartedhelp);
 				break;
 
-            case FCEUX_CONTEXT_GUICONFIG:
-                ConfigGUI();
-                break;
+			case FCEUX_CONTEXT_GUICONFIG:
+				ConfigGUI();
+				break;
 			}
 		}
 		break;
 
 	case WM_SYSCOMMAND:
-		if(GameInfo && wParam == SC_SCREENSAVE && (goptions & GOO_DISABLESS))
+		if (GameInfo && wParam == SC_SCREENSAVE && (goptions & GOO_DISABLESS))
 			return(0);
 
 		//adelikat: If we are going to disable screensave, we should disable monitor off as well
-		if(GameInfo && wParam == SC_MONITORPOWER && (goptions & GOO_DISABLESS))
+		if (GameInfo && wParam == SC_MONITORPOWER && (goptions & GOO_DISABLESS))
 			return(0);
 
-		if(wParam==SC_KEYMENU)
+		if (wParam == SC_KEYMENU)
 		{
-			if(GameInfo && ((InputType[2]==SIFC_FKB) || (InputType[2]==SIFC_SUBORKB) || (InputType[2]==SIFC_PEC586KB)) && cidisabled)
+			if (GameInfo && ((InputType[2] == SIFC_FKB) || (InputType[2] == SIFC_SUBORKB) || (InputType[2] == SIFC_PEC586KB)) && cidisabled)
 				break;
-			if(lParam == VK_RETURN || fullscreen || tog) break;
+			if (lParam == VK_RETURN || fullscreen || tog) break;
 		}
 		goto proco;
 	case WM_SYSKEYDOWN:
-		if(GameInfo && ((InputType[2]==SIFC_FKB) || (InputType[2]==SIFC_SUBORKB) || (InputType[2]==SIFC_PEC586KB)) && cidisabled)
+		if (GameInfo && ((InputType[2] == SIFC_FKB) || (InputType[2] == SIFC_SUBORKB) || (InputType[2] == SIFC_PEC586KB)) && cidisabled)
 			break; // Hopefully this won't break DInput...
 
-		if(fullscreen || tog)
+		if (fullscreen || tog)
 		{
-			if(wParam==VK_MENU)
+			if (wParam == VK_MENU)
 				break;
 		}
 
-		if(wParam==VK_F10)
+		if (wParam == VK_F10)
 			break;			// 11.12.08 CH4 Disable F10 as System Key dammit
-/*
-		if(wParam == VK_RETURN)
-		{
-			if(!(lParam&(1<<30)))
-			{
-				UpdateCheckedMenuItems();
-				changerecursive=1;
-				if(!SetVideoMode(fullscreen^1))
-					SetVideoMode(fullscreen);
-				changerecursive=0;
-			}
-			break;
-		}
-adelikat: Outsourced this to a remappable hotkey
-*/
+		/*
+				if(wParam == VK_RETURN)
+				{
+					if(!(lParam&(1<<30)))
+					{
+						UpdateCheckedMenuItems();
+						changerecursive=1;
+						if(!SetVideoMode(fullscreen^1))
+							SetVideoMode(fullscreen);
+						changerecursive=0;
+					}
+					break;
+				}
+		adelikat: Outsourced this to a remappable hotkey
+		*/
 		goto proco;
 
 	case WM_KEYDOWN:
-		if(GameInfo)
+		if (GameInfo)
 		{
 			//Only disable command keys if a game is loaded(and the other conditions are right, of course).
-			if((InputType[2]==SIFC_FKB) || (InputType[2]==SIFC_SUBORKB) || (InputType[2]==SIFC_PEC586KB))
+			if ((InputType[2] == SIFC_FKB) || (InputType[2] == SIFC_SUBORKB) || (InputType[2] == SIFC_PEC586KB))
 			{
-				if(wParam==VK_SCROLL)
+				if (wParam == VK_SCROLL)
 				{
-					cidisabled^=1;
-					FCEUI_DispMessage("%s Keyboard %sabled.",0,InputType[2]==SIFC_FKB?"Family":(InputType[2]==SIFC_SUBORKB?"Subor":"PEC586"),cidisabled?"en":"dis");
+					cidisabled ^= 1;
+					FCEUI_DispMessage("%s Keyboard %sabled.", 0, InputType[2] == SIFC_FKB ? "Family" : (InputType[2] == SIFC_SUBORKB ? "Subor" : "PEC586"), cidisabled ? "en" : "dis");
 				}
-				if(cidisabled)
+				if (cidisabled)
 					break; // Hopefully this won't break DInput...
 			}
 		}
@@ -2575,51 +2632,52 @@ adelikat: Outsourced this to a remappable hotkey
 		}
 		break;
 	case WM_ACTIVATEAPP:
-		if((BOOL)wParam)
+		if ((BOOL)wParam)
 			nofocus = 0;
 		else
 			nofocus = 1;
 		goto proco;
 	case WM_ENTERMENULOOP:
 		UpdateCheckedMenuItems();
-		EnableMenuItem(fceumenu,MENU_RESET,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_RESET)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_POWER,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_POWER)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_EJECT_DISK,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_EJECT_DISK)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_SWITCH_DISK,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_SWITCH_DISK)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_INSERT_COIN,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INSERT_COIN)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_INSERT_COIN2, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INSERT_COIN) ? MF_ENABLED : MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_SERVICE_BUTTON, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INSERT_COIN) ? MF_ENABLED : MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_INPUT_BARCODE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INPUT_BARCODE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_TASEDITOR,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_TASEDITOR)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_CLOSE_FILE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_CLOSEGAME) && GameInfo ?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_RECENT_FILES,MF_BYCOMMAND | ((FCEU_IsValidUI(FCEUI_OPENGAME) && HasRecentFiles()) ?MF_ENABLED:MF_GRAYED)); //adelikat - added && recent_files, otherwise this line prevents recent from ever being gray when TAS Editor is not engaged
-		EnableMenuItem(fceumenu,MENU_OPEN_FILE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_OPENGAME)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_RECORD_MOVIE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_RECORDMOVIE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_REPLAY_MOVIE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PLAYMOVIE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_MOVIE_RECENT,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PLAYMOVIE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_STOP_MOVIE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_STOPMOVIE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,ID_FILE_PLAYMOVIEFROMBEGINNING,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PLAYFROMBEGINNING)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu, ID_FILE_TOGGLE_RECORDING_MOVIE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_TOGGLERECORDINGMOVIE)?MF_ENABLED:MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_RESET, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_RESET) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_POWER, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_POWER) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_EJECT_DISK, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_EJECT_DISK) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_SWITCH_DISK, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_SWITCH_DISK) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_INSERT_COIN, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INSERT_COIN) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_INSERT_COIN2, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INSERT_COIN) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_SERVICE_BUTTON, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INSERT_COIN) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_INPUT_BARCODE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INPUT_BARCODE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_TASEDITOR, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_TASEDITOR) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_CLOSE_FILE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_CLOSEGAME) && GameInfo ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_RECENT_FILES, MF_BYCOMMAND | ((FCEU_IsValidUI(FCEUI_OPENGAME) && HasRecentFiles()) ? MF_ENABLED : MF_GRAYED)); //adelikat - added && recent_files, otherwise this line prevents recent from ever being gray when TAS Editor is not engaged
+		EnableMenuItem(fceumenu, MENU_OPEN_FILE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_OPENGAME) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_RECORD_MOVIE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_RECORDMOVIE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_REPLAY_MOVIE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PLAYMOVIE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_MOVIE_RECENT, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PLAYMOVIE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_STOP_MOVIE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_STOPMOVIE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, ID_FILE_PLAYMOVIEFROMBEGINNING, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PLAYFROMBEGINNING) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, ID_FILE_TOGGLE_RECORDING_MOVIE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_TOGGLERECORDINGMOVIE) ? MF_ENABLED : MF_GRAYED));
 		EnableMenuItem(fceumenu, ID_FILE_INSERT_1_FRAME, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_INSERT1FRAME) ? MF_ENABLED : MF_GRAYED));
 		EnableMenuItem(fceumenu, ID_FILE_DELETE_1_FRAME, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_DELETE1FRAME) ? MF_ENABLED : MF_GRAYED));
 		EnableMenuItem(fceumenu, ID_FILE_TRUNCATE_MOVIE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_TRUNCATEMOVIE) ? MF_ENABLED : MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_SAVESTATE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_QUICKSAVE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_LOADSTATE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_QUICKLOAD)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_SAVE_STATE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_SAVESTATE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_LOAD_STATE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_LOADSTATE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_NEXTSAVESTATE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_NEXTSAVESTATE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_PREVIOUSSAVESTATE,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PREVIOUSSAVESTATE)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_VIEWSAVESLOTS,MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_VIEWSLOTS)?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_STOP_AVI,MF_BYCOMMAND | (FCEUI_AviIsRecording()?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,MENU_STOP_WAV,MF_BYCOMMAND | (loggingSound?MF_ENABLED:MF_GRAYED));
-		EnableMenuItem(fceumenu,ID_FILE_CLOSELUAWINDOWS,MF_BYCOMMAND | (LuaConsoleHWnd?MF_ENABLED:MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_SAVESTATE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_QUICKSAVE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_LOADSTATE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_QUICKLOAD) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_SAVE_STATE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_SAVESTATE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_LOAD_STATE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_LOADSTATE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_NEXTSAVESTATE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_NEXTSAVESTATE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_PREVIOUSSAVESTATE, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_PREVIOUSSAVESTATE) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_VIEWSAVESLOTS, MF_BYCOMMAND | (FCEU_IsValidUI(FCEUI_VIEWSLOTS) ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_STOP_AVI, MF_BYCOMMAND | (FCEUI_AviIsRecording() ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, MENU_STOP_WAV, MF_BYCOMMAND | (loggingSound ? MF_ENABLED : MF_GRAYED));
+		EnableMenuItem(fceumenu, ID_FILE_CLOSELUAWINDOWS, MF_BYCOMMAND | (LuaConsoleHWnd ? MF_ENABLED : MF_GRAYED));
 		// PAL and PPU should not be changed while a movie is recorded/played
 		if (FCEUMOV_Mode(MOVIEMODE_INACTIVE))
 		{
 			EnableMenuItem(fceumenu, MENU_PAL, MF_ENABLED);
 			EnableMenuItem(fceumenu, ID_NEWPPU, MF_ENABLED);
 			EnableMenuItem(fceumenu, ID_OLDPPU, MF_ENABLED);
-		} else
+		}
+		else
 		{
 			EnableMenuItem(fceumenu, MENU_PAL, MF_GRAYED);
 			EnableMenuItem(fceumenu, ID_NEWPPU, MF_GRAYED);
@@ -2632,7 +2690,8 @@ adelikat: Outsourced this to a remappable hotkey
 			EnableMenuItem(fceumenu, MENU_ENABLE_AUTOSAVE, MF_GRAYED);
 			EnableMenuItem(fceumenu, ID_ENABLE_BACKUPSAVESTATES, MF_GRAYED);
 			EnableMenuItem(fceumenu, ID_ENABLE_COMPRESSSAVESTATES, MF_GRAYED);
-		} else
+		}
+		else
 		{
 			EnableMenuItem(fceumenu, MENU_ENABLE_AUTOSAVE, MF_ENABLED);
 			EnableMenuItem(fceumenu, ID_ENABLE_BACKUPSAVESTATES, MF_ENABLED);
@@ -2640,8 +2699,8 @@ adelikat: Outsourced this to a remappable hotkey
 		}
 
 	default:
-proco:
-		return DefWindowProc(hWnd,msg,wParam,lParam);
+	proco:
+		return DefWindowProc(hWnd, msg, wParam, lParam);
 	}
 	return 0;
 }
@@ -2663,19 +2722,19 @@ void FixWXY(int pref, bool shift_held)
 	// round to integer values
 	if (((eoptions & EO_FORCEISCALE) && !shift_held) || (!(eoptions & EO_FORCEISCALE) && shift_held))
 	{
-		int x,y;
+		int x, y;
 
 		x = winsizemulx * 2;
 		y = winsizemuly * 2;
 
-		x = (x>>1) + (x&1);
-		y = (y>>1) + (y&1);
+		x = (x >> 1) + (x & 1);
+		y = (y >> 1) + (y & 1);
 
-		if(!x) x=1;
-		if(!y) y=1;
+		if (!x) x = 1;
+		if (!y) y = 1;
 
 		winsizemulx = x;
-		winsizemuly = y;    
+		winsizemuly = y;
 	}
 
 	/*
@@ -2689,7 +2748,7 @@ void FixWXY(int pref, bool shift_held)
 
 void UpdateFCEUWindow(void)
 {
-	if(vchanged && !fullscreen && !changerecursive && !nofocus)
+	if (vchanged && !fullscreen && !changerecursive && !nofocus)
 	{
 		SetVideoMode(0);
 		vchanged = 0;
@@ -2697,9 +2756,9 @@ void UpdateFCEUWindow(void)
 
 	BlockingCheck();
 
-	if(!(eoptions & EO_BGRUN))
+	if (!(eoptions & EO_BGRUN))
 	{
-		while(nofocus)
+		while (nofocus)
 		{
 
 			Sleep(75);
@@ -2739,14 +2798,14 @@ int CreateMainWindow()
 	winclass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH); //mbg merge 7/17/06 added cast
 	winclass.lpszClassName = "FCEUXWindowClass";
 
-	if(!RegisterClassEx(&winclass))
+	if (!RegisterClassEx(&winclass))
 	{
 		return FALSE;
 	}
 
 	AdjustWindowRectEx(&tmp, WS_OVERLAPPEDWINDOW, 1, 0);
 
-	fceumenu = LoadMenu(fceu_hInstance,"FCEUMENU");
+	fceumenu = LoadMenu(fceu_hInstance, "FCEUMENU");
 	UpdateMenuHotkeys(FCEUMENU_MAIN);
 	recentmenu = CreateMenu();
 	recentluamenu = CreateMenu();
@@ -2759,8 +2818,8 @@ int CreateMainWindow()
 
 	updateGameDependentMenus();
 	updateGameDependentMenusDebugger();
-	if (MainWindow_wndx==-32000) MainWindow_wndx=0; //Just in case
-	if (MainWindow_wndy==-32000) MainWindow_wndy=0;
+	if (MainWindow_wndx == -32000) MainWindow_wndx = 0; //Just in case
+	if (MainWindow_wndy == -32000) MainWindow_wndy = 0;
 	hAppWnd = CreateWindowEx(
 		0,
 		"FCEUXWindowClass",
@@ -2773,7 +2832,7 @@ int CreateMainWindow()
 		NULL,
 		fceumenu,
 		fceu_hInstance,
-		NULL );  
+		NULL);
 
 	//CenterWindowOnScreen(hAppWnd);
 	DragAcceptFiles(hAppWnd, 1);
@@ -2795,11 +2854,12 @@ void SetMainWindowStuff()
 		winheight = tmp.bottom - tmp.top;
 
 		ShowWindow(hAppWnd, SW_SHOWMAXIMIZED);
-	} else
+	}
+	else
 	{
 		RECT srect;
 
-		if(WindowXC != ( 1 << 30 ))
+		if (WindowXC != (1 << 30))
 		{
 			/* Subtracting and adding for if(eoptions&EO_USERFORCE) below. */
 			tmp.bottom -= tmp.top;
@@ -2824,7 +2884,7 @@ void SetMainWindowStuff()
 			srect.right,
 			srect.bottom,
 			SWP_SHOWWINDOW
-			);
+		);
 
 		winwidth = srect.right;
 		winheight = srect.bottom;
@@ -2846,7 +2906,7 @@ int GetClientAbsRect(LPRECT lpRect)
 	POINT point;
 	point.x = point.y = 0;
 
-	if(!ClientToScreen(hAppWnd, &point))
+	if (!ClientToScreen(hAppWnd, &point))
 	{
 		return 0;
 	}
@@ -2856,10 +2916,10 @@ int GetClientAbsRect(LPRECT lpRect)
 
 	//if(ismaximized)
 	//{
-		RECT al;
-		GetClientRect(hAppWnd, &al);
-		lpRect->right = point.x + al.right;
-		lpRect->bottom = point.y + al.bottom;
+	RECT al;
+	GetClientRect(hAppWnd, &al);
+	lpRect->right = point.x + al.right;
+	lpRect->bottom = point.y + al.bottom;
 	//}
 	//else
 	//{
@@ -2876,27 +2936,27 @@ void FCEUD_AviRecordTo(void)
 	char szChoice[MAX_PATH];
 
 	string tempFilename, aviFilename;
-		
+
 	std::string aviDirectory = FCEU_GetPath(21);  //21 = FCEUMKF_AVI
-	if (aviDirectory.find_last_of("\\") != (aviDirectory.size()-1))
+	if (aviDirectory.find_last_of("\\") != (aviDirectory.size() - 1))
 		aviDirectory.append("\\");			//if directory override has no \ then add one
 
 	//if we are playing a movie, construct the filename from the current movie.
-	if(FCEUMOV_Mode(MOVIEMODE_PLAY|MOVIEMODE_RECORD)) //adelikat: TOOD: Think about this.  I think MOVIEMODE_FINISHED shouldn't not be included here.  Am I wrong?
+	if (FCEUMOV_Mode(MOVIEMODE_PLAY | MOVIEMODE_RECORD)) //adelikat: TOOD: Think about this.  I think MOVIEMODE_FINISHED shouldn't not be included here.  Am I wrong?
 	{
 		tempFilename = GetMfn();	//get movie filename
-		tempFilename.erase(0,1);	//remove dot
+		tempFilename.erase(0, 1);	//remove dot
 	}
 	//else construct it from the ROM name.
 	else
 		tempFilename = mass_replace(GetRomName(), "|", ".").c_str();
-	
-	aviFilename = aviDirectory + tempFilename;	//concate avi directory and movie filename
-				
-	strcpy(szChoice, aviFilename.c_str());
-	char* dot = strrchr(szChoice,'.');
 
-	if (dot) *dot='\0';
+	aviFilename = aviDirectory + tempFilename;	//concate avi directory and movie filename
+
+	strcpy(szChoice, aviFilename.c_str());
+	char* dot = strrchr(szChoice, '.');
+
+	if (dot) *dot = '\0';
 	strcat(szChoice, ".avi");
 
 	// avi record file browser
@@ -2911,7 +2971,7 @@ void FCEUD_AviRecordTo(void)
 	ofn.nMaxFile = MAX_PATH;
 	ofn.Flags = OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT;
 
-	if(GetSaveFileName(&ofn))
+	if (GetSaveFileName(&ofn))
 		FCEUI_AviBegin(szChoice);
 }
 
@@ -2928,29 +2988,33 @@ void FCEUD_CmdOpen(void)
 
 bool FCEUD_PauseAfterPlayback()
 {
-	return pauseAfterPlayback!=0;
+	return pauseAfterPlayback != 0;
 }
 
 void ChangeContextMenuItemText(int menuitem, string text, HMENU menu)
 {
-	MENUITEMINFO moo;
+	std::wstring wtext = FCEUWinStringToWide(text);
+	MENUITEMINFOW moo;
+	memset(&moo, 0, sizeof(moo));
 	moo.cbSize = sizeof(moo);
 	moo.fMask = MIIM_TYPE;
-	moo.cch = NULL;
-	GetMenuItemInfo(menu, menuitem, FALSE, &moo);
-	moo.dwTypeData = (LPSTR)text.c_str();
-	SetMenuItemInfo(menu, menuitem, FALSE, &moo);
+	moo.fType = MFT_STRING;
+	moo.cch = (UINT)wtext.size();
+	moo.dwTypeData = (LPWSTR)wtext.c_str();
+	SetMenuItemInfoW(menu, menuitem, FALSE, &moo);
 }
 
 void ChangeMenuItemText(int menuitem, string text)
 {
-	MENUITEMINFO moo;
+	std::wstring wtext = FCEUWinStringToWide(text);
+	MENUITEMINFOW moo;
+	memset(&moo, 0, sizeof(moo));
 	moo.cbSize = sizeof(moo);
 	moo.fMask = MIIM_TYPE;
-	moo.cch = NULL;
-	GetMenuItemInfo(fceumenu, menuitem, FALSE, &moo);
-	moo.dwTypeData = (LPSTR)text.c_str();
-	SetMenuItemInfo(fceumenu, menuitem, FALSE, &moo);
+	moo.fType = MFT_STRING;
+	moo.cch = (UINT)wtext.size();
+	moo.dwTypeData = (LPWSTR)wtext.c_str();
+	SetMenuItemInfoW(fceumenu, menuitem, FALSE, &moo);
 }
 
 string HOTKEYMENUINDEX::getQualifiedMenuText(FCEUMENU_INDEX menu_index) {
@@ -3200,7 +3264,7 @@ int GetCurrentContextIndex()
 				return FCEUMENU_CONTEXT_PLAYING_READONLY; // Game+Movie+Playing+readonly
 			else
 				return FCEUMENU_CONTEXT_PLAYING_READWRITE; // Game+Movie+Playing+readwrite
-															   //If there is a ROM loaded but no movie
+		//If there is a ROM loaded but no movie
 	}
 	else if (GameInfo)
 		return FCEUMENU_CONTEXT_GAME; // Game+NoMovie
@@ -3213,21 +3277,21 @@ int GetCurrentContextIndex()
 //It gets a filename from the user then calls CreateMovie()
 void SaveMovieAs()
 {
-	const char filter[]="NES Movie file (*.fm2)\0*.fm2\0All Files (*.*)\0*.*\0\0";
+	const char filter[] = "NES Movie file (*.fm2)\0*.fm2\0All Files (*.*)\0*.*\0\0";
 	char nameo[2048];
 	std::string tempName;
 
 	OPENFILENAME ofn;
-	memset(&ofn,0,sizeof(ofn));
-	ofn.lStructSize=sizeof(ofn);
-	ofn.hInstance=fceu_hInstance;
-	ofn.lpstrTitle="Save Movie as...";
-	ofn.lpstrFilter=filter;
-	strcpy(nameo,curMovieFilename.c_str());
-	ofn.lpstrFile=nameo;
-	ofn.lpstrDefExt="fm2";
-	ofn.nMaxFile=256;
-	ofn.Flags=OFN_EXPLORER|OFN_FILEMUSTEXIST|OFN_HIDEREADONLY;
+	memset(&ofn, 0, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hInstance = fceu_hInstance;
+	ofn.lpstrTitle = "Save Movie as...";
+	ofn.lpstrFilter = filter;
+	strcpy(nameo, curMovieFilename.c_str());
+	ofn.lpstrFile = nameo;
+	ofn.lpstrDefExt = "fm2";
+	ofn.nMaxFile = 256;
+	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 	ofn.hwndOwner = hMemView;
 	if (GetSaveFileName(&ofn))
 	{
@@ -3262,9 +3326,9 @@ void SaveSnapshotAs()
 	ofn.hInstance = fceu_hInstance;
 	ofn.lpstrTitle = "Save Snapshot As...";
 	ofn.lpstrFilter = filter;
-	strcpy(nameo,FCEU_MakeFName(FCEUMKF_SNAP,0,"png").c_str());
+	strcpy(nameo, FCEU_MakeFName(FCEUMKF_SNAP, 0, "png").c_str());
 
-	nameo[strlen(nameo)-6] = '\0';
+	nameo[strlen(nameo) - 6] = '\0';
 
 	ofn.lpstrFile = nameo;
 	ofn.lpstrDefExt = "fcs";
@@ -3273,8 +3337,8 @@ void SaveSnapshotAs()
 	ofn.nMaxFile = 256;
 	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 	ofn.lpstrDefExt = "png";
-	
-	if(GetSaveFileName(&ofn))
+
+	if (GetSaveFileName(&ofn))
 		FCEUI_SetSnapshotAsName(nameo);
 	FCEUI_SaveSnapshotAs();
 }
@@ -3338,7 +3402,7 @@ POINT CalcSubWindowPos(HWND hDlg, POINT* conf)
 
 static bool IsInputLegal(IsLetterLegalProc proc, int index, char letter)
 {
-	return !proc || letter == VK_BACK || GetKeyState(VK_CONTROL) & 0x8000 || proc(index,letter);
+	return !proc || letter == VK_BACK || GetKeyState(VK_CONTROL) & 0x8000 || proc(index, letter);
 }
 
 bool IsLetterLegalGG(int index, char letter)
@@ -3358,13 +3422,13 @@ bool IsLetterLegalHex(int index, char letter)
 bool IsLetterLegalMemwatchAddress(int index, char letter)
 {
 	//accept normal hex stuff
-	if(letter >= '0' && letter <= '9' || letter >= 'A' && letter <= 'F' || letter >= 'a' && letter <= 'f')
+	if (letter >= '0' && letter <= '9' || letter >= 'A' && letter <= 'F' || letter >= 'a' && letter <= 'f')
 		return true;
-	
+
 	//accept prefixes
-	if(index == 0)
+	if (index == 0)
 	{
-		if(letter == 'x' || letter == 'X' || letter == '!')
+		if (letter == 'x' || letter == 'X' || letter == '!')
 			return true;
 	}
 
@@ -3373,7 +3437,7 @@ bool IsLetterLegalMemwatchAddress(int index, char letter)
 
 bool IsLetterLegalHexList(int index, char letter)
 {
-	return IsLetterLegalHex(index,letter) || letter == ',' || letter == ' ';
+	return IsLetterLegalHex(index, letter) || letter == ',' || letter == ' ';
 }
 
 bool IsLetterLegalCheat(int index, char letter)
@@ -3457,76 +3521,76 @@ IsLetterLegalProc GetIsLetterLegalProc(UINT id)
 	switch (id)
 	{
 		// Game genie text in Cheat and Game Genie Encoder/Decoder
-		case IDC_CHEAT_GAME_GENIE_TEXT:
-		case IDC_GAME_GENIE_CODE:
-			return &IsLetterLegalGG;
+	case IDC_CHEAT_GAME_GENIE_TEXT:
+	case IDC_GAME_GENIE_CODE:
+		return &IsLetterLegalGG;
 
-			// Addresses in Debugger
-		case IDC_DEBUGGER_VAL_PCSEEK:
-		case IDC_DEBUGGER_VAL_PC:
-		case IDC_DEBUGGER_VAL_A:
-		case IDC_DEBUGGER_VAL_X:
-		case IDC_DEBUGGER_VAL_Y:
-		case IDC_DEBUGGER_BOOKMARK:
+		// Addresses in Debugger
+	case IDC_DEBUGGER_VAL_PCSEEK:
+	case IDC_DEBUGGER_VAL_PC:
+	case IDC_DEBUGGER_VAL_A:
+	case IDC_DEBUGGER_VAL_X:
+	case IDC_DEBUGGER_VAL_Y:
+	case IDC_DEBUGGER_BOOKMARK:
 
-			// Debugger -> Add breakpoint
-		case IDC_ADDBP_ADDR_START: case IDC_ADDBP_ADDR_END:
+		// Debugger -> Add breakpoint
+	case IDC_ADDBP_ADDR_START: case IDC_ADDBP_ADDR_END:
 
-			// Array Size, Init value in Symbolic Name in Debugger
-		case IDC_EDIT_SYMBOLIC_ARRAY: case IDC_EDIT_SYMBOLIC_INIT:
+		// Array Size, Init value in Symbolic Name in Debugger
+	case IDC_EDIT_SYMBOLIC_ARRAY: case IDC_EDIT_SYMBOLIC_INIT:
 
-			// Address, Value, Compare, Known Value, Note equal, Greater than and Less than in Cheat
-		case IDC_CHEAT_ADDR: case IDC_CHEAT_VAL: case IDC_CHEAT_COM:
-		case IDC_CHEAT_VAL_KNOWN: case IDC_CHEAT_VAL_NE_BY:
-		case IDC_CHEAT_VAL_GT_BY: case IDC_CHEAT_VAL_LT_BY:
+		// Address, Value, Compare, Known Value, Note equal, Greater than and Less than in Cheat
+	case IDC_CHEAT_ADDR: case IDC_CHEAT_VAL: case IDC_CHEAT_COM:
+	case IDC_CHEAT_VAL_KNOWN: case IDC_CHEAT_VAL_NE_BY:
+	case IDC_CHEAT_VAL_GT_BY: case IDC_CHEAT_VAL_LT_BY:
 
-			// Address, Value and Compare in Game Genie Encoder/Decoder
-		case IDC_GAME_GENIE_ADDR: case IDC_GAME_GENIE_VAL: case IDC_GAME_GENIE_COMP:
+		// Address, Value and Compare in Game Genie Encoder/Decoder
+	case IDC_GAME_GENIE_ADDR: case IDC_GAME_GENIE_VAL: case IDC_GAME_GENIE_COMP:
 
-			// Address controls in Memory watch
-		case MW_ADDR00: case MW_ADDR01: case MW_ADDR02: case MW_ADDR03:
-		case MW_ADDR04: case MW_ADDR05: case MW_ADDR06: case MW_ADDR07:
-		case MW_ADDR08: case MW_ADDR09: case MW_ADDR10: case MW_ADDR11:
-		case MW_ADDR12: case MW_ADDR13: case MW_ADDR14: case MW_ADDR15:
-		case MW_ADDR16: case MW_ADDR17: case MW_ADDR18: case MW_ADDR19:
-		case MW_ADDR20: case MW_ADDR21: case MW_ADDR22: case MW_ADDR23:
-			return &IsLetterLegalMemwatchAddress;
+		// Address controls in Memory watch
+	case MW_ADDR00: case MW_ADDR01: case MW_ADDR02: case MW_ADDR03:
+	case MW_ADDR04: case MW_ADDR05: case MW_ADDR06: case MW_ADDR07:
+	case MW_ADDR08: case MW_ADDR09: case MW_ADDR10: case MW_ADDR11:
+	case MW_ADDR12: case MW_ADDR13: case MW_ADDR14: case MW_ADDR15:
+	case MW_ADDR16: case MW_ADDR17: case MW_ADDR18: case MW_ADDR19:
+	case MW_ADDR20: case MW_ADDR21: case MW_ADDR22: case MW_ADDR23:
+		return &IsLetterLegalMemwatchAddress;
 
-		case IDC_EDIT_COMPAREADDRESS:
-			return &IsLetterLegalHex;
+	case IDC_EDIT_COMPAREADDRESS:
+		return &IsLetterLegalHex;
 
-			// Specific Address in RAM Search
-			// RAM Watch / RAM Search / Cheat -> Add watch (current only in adding watch operation)
-		case IDC_EDIT_COMPAREADDRESSES:
-			return &IsLetterLegalHexList;
+		// Specific Address in RAM Search
+		// RAM Watch / RAM Search / Cheat -> Add watch (current only in adding watch operation)
+	case IDC_EDIT_COMPAREADDRESSES:
+		return &IsLetterLegalHexList;
 
-			// Size multiplier and TV Aspect in Video Config
-		case IDC_WINSIZE_MUL_X: case IDC_WINSIZE_MUL_Y:
-		case IDC_TVASPECT_X: case IDC_TVASPECT_Y:
-			return &IsLetterLegalFloat;
+		// Size multiplier and TV Aspect in Video Config
+	case IDC_WINSIZE_MUL_X: case IDC_WINSIZE_MUL_Y:
+	case IDC_TVASPECT_X: case IDC_TVASPECT_Y:
+		return &IsLetterLegalFloat;
 
-			// Cheat code in Cheat
-		case IDC_CHEAT_TEXT:
-			return &IsLetterLegalCheat;
+		// Cheat code in Cheat
+	case IDC_CHEAT_TEXT:
+		return &IsLetterLegalCheat;
 
-			// PRG ROM, PRG RAM, PRG NVRAM, CHR ROM, CHR RAM and CHR NVRAM in NES Header Editor
-		case IDC_PRGROM_EDIT: case IDC_PRGRAM_EDIT: case IDC_PRGNVRAM_EDIT:
-		case IDC_CHRROM_EDIT: case IDC_CHRRAM_EDIT: case IDC_CHRNVRAM_EDIT:
-			return &IsLetterLegalSize;
+		// PRG ROM, PRG RAM, PRG NVRAM, CHR ROM, CHR RAM and CHR NVRAM in NES Header Editor
+	case IDC_PRGROM_EDIT: case IDC_PRGRAM_EDIT: case IDC_PRGNVRAM_EDIT:
+	case IDC_CHRROM_EDIT: case IDC_CHRRAM_EDIT: case IDC_CHRNVRAM_EDIT:
+		return &IsLetterLegalSize;
 
-			// Specific value, Different by and Modulo in RAM search
-		case IDC_EDIT_COMPAREVALUE:
-		case IDC_EDIT_DIFFBY:
-		case IDC_EDIT_MODBY:
-			{
-				extern char rs_t;
-				switch (rs_t)
-				{
-					case 's': return &IsLetterLegalDecHexMixed;
-					case 'u': return &IsLetterLegalUnsignedDecHexMixed;
-					case 'h': return &IsLetterLegalHex;
-				}
-			}
+		// Specific value, Different by and Modulo in RAM search
+	case IDC_EDIT_COMPAREVALUE:
+	case IDC_EDIT_DIFFBY:
+	case IDC_EDIT_MODBY:
+	{
+		extern char rs_t;
+		switch (rs_t)
+		{
+		case 's': return &IsLetterLegalDecHexMixed;
+		case 'u': return &IsLetterLegalUnsignedDecHexMixed;
+		case 'h': return &IsLetterLegalHex;
+		}
+	}
 	}
 	return NULL;
 }
@@ -3538,51 +3602,51 @@ LRESULT APIENTRY FilterEditCtrlProc(HWND hwnd, UINT msg, WPARAM wP, LPARAM lP)
 
 	switch (msg)
 	{
-		case WM_PASTE:
+	case WM_PASTE:
+	{
+
+		IsLetterLegalProc isLetterLegal = GetIsLetterLegalProc(GetDlgCtrlID(hwnd));
+
+		if (isLetterLegal)
+		{
+			if (OpenClipboard(hwnd))
 			{
-
-				IsLetterLegalProc isLetterLegal = GetIsLetterLegalProc(GetDlgCtrlID(hwnd));
-
-				if (isLetterLegal)
+				HANDLE handle = GetClipboardData(CF_TEXT);
+				if (handle)
 				{
-					if (OpenClipboard(hwnd))
+
+					// get the original clipboard string
+					char* clipStr = (char*)GlobalLock(handle);
+
+					// check if the text in clipboard has illegal characters
+					int len = strlen(clipStr);
+					for (int i = 0; i < len; ++i)
 					{
-						HANDLE handle = GetClipboardData(CF_TEXT);
-						if (handle)
+						if (!isLetterLegal(i, clipStr[i]))
 						{
-
-							// get the original clipboard string
-							char* clipStr = (char*)GlobalLock(handle);
-
-							// check if the text in clipboard has illegal characters
-							int len = strlen(clipStr);
-							for (int i = 0; i < len; ++i)
-							{
-								if (!isLetterLegal(i,clipStr[i]))
-								{
-									through = false;
-									// Show Edit control tip, just like the control with ES_NUMBER do
-									ShowLetterIllegalBalloonTip(hwnd, isLetterLegal);
-									break;
-								}
-							}
-							GlobalUnlock(handle);
-							CloseClipboard();
+							through = false;
+							// Show Edit control tip, just like the control with ES_NUMBER do
+							ShowLetterIllegalBalloonTip(hwnd, isLetterLegal);
+							break;
 						}
 					}
+					GlobalUnlock(handle);
+					CloseClipboard();
 				}
 			}
-			break;
+		}
+	}
+	break;
 
-		case WM_CHAR:
-			{
-				DWORD cpBegin, cpEnd;
-				SendMessage(hwnd, EM_GETSEL, (LPARAM)&cpBegin, (LPARAM)&cpEnd);
-				IsLetterLegalProc isLetterLegal = GetIsLetterLegalProc(GetDlgCtrlID(hwnd));
-				through = IsInputLegal(isLetterLegal, (int)cpBegin, wP);
-				if (!through)
-					ShowLetterIllegalBalloonTip(hwnd, isLetterLegal);
-			}
+	case WM_CHAR:
+	{
+		DWORD cpBegin, cpEnd;
+		SendMessage(hwnd, EM_GETSEL, (LPARAM)&cpBegin, (LPARAM)&cpEnd);
+		IsLetterLegalProc isLetterLegal = GetIsLetterLegalProc(GetDlgCtrlID(hwnd));
+		through = IsInputLegal(isLetterLegal, (int)cpBegin, wP);
+		if (!through)
+			ShowLetterIllegalBalloonTip(hwnd, isLetterLegal);
+	}
 	}
 
 	return through ? CallWindowProc(DefaultEditCtrlProc, hwnd, msg, wP, lP) : result;

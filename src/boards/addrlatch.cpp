@@ -425,7 +425,18 @@ static void M227Sync(void) {
 		}
 	}
 	else {
-		if (S) {
+		/*
+		 * Submapper 3:
+		 * $8000-$BFFF uses the selected 16 KiB bank,
+		 * $C000-$FFFF is always fixed to absolute PRG bank 0.
+		 *
+		 * L and S are ignored in this mode, matching NRS.
+		 */
+		if (submapper == 3) {
+			setprg16(0x8000, p);
+			setprg16(0xC000, 0);
+		}
+		else if (S) {
 			if (L) {
 				setprg16(0x8000, p & 0x3E);
 				setprg16(0xC000, p | 7);
@@ -442,12 +453,16 @@ static void M227Sync(void) {
 			}
 			else {
 				setprg16(0x8000, p);
-				setprg16(0xC000, submapper == 2 ? (p & 0x20) : (p & 0x38));
+				setprg16(
+					0xC000,
+					submapper == 2 ? (p & 0x20) : (p & 0x38)
+				);
 			}
 		}
 	}
 
-	if (latche & 0x80 && submapper > 0) /* CHR-RAM write protection not used on single-game cartridges (submapper 0) */
+	if (latche & 0x80 && submapper > 0)
+		/* CHR-RAM write protection is enabled for nonzero submappers. */
 		SetupCartCHRMapping(0, CHRptr[0], 0x2000, 0);
 	else
 		SetupCartCHRMapping(0, CHRptr[0], 0x2000, 1);

@@ -56,7 +56,7 @@ const char *FCEUI_GetAboutString(void)
 
 		"\n"
 		"\n"
-		"FCEUX 2.6.6 Y320\n"
+		"FCEUX 2.6.6 Y321\n"
 		"Made By Yhc Studio\n"
 		FCEUX_BUILD_TIMESTAMP "\n";
 		

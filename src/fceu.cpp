@@ -93,7 +93,59 @@ extern void RefreshThrottleFPS();
 #include <cstdarg>
 #include <ctime>
 
+#ifdef __WIN_DRIVER__
+#include <windows.h>
+#endif
+
 using namespace std;
+
+#ifdef __WIN_DRIVER__
+static std::string FCEUWinACPToUTF8(const char* s)
+{
+	if (!s || !*s)
+		return std::string();
+
+	int wlen = MultiByteToWideChar(CP_ACP, 0, s, -1, NULL, 0);
+	if (wlen <= 0)
+		return std::string(s);
+
+	std::wstring ws;
+	ws.resize(wlen - 1);
+	MultiByteToWideChar(CP_ACP, 0, s, -1, &ws[0], wlen);
+
+	int u8len = WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), -1, NULL, 0, NULL, NULL);
+	if (u8len <= 0)
+		return std::string(s);
+
+	std::string out;
+	out.resize(u8len - 1);
+	WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), -1, &out[0], u8len, NULL, NULL);
+	return out;
+}
+
+static std::string FCEUWinUTF8ToACP(const char* s)
+{
+	if (!s || !*s)
+		return std::string();
+
+	int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, NULL, 0);
+	if (wlen <= 0)
+		return std::string(s);
+
+	std::wstring ws;
+	ws.resize(wlen - 1);
+	MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, &ws[0], wlen);
+
+	int alen = WideCharToMultiByte(CP_ACP, 0, ws.c_str(), -1, NULL, 0, NULL, NULL);
+	if (alen <= 0)
+		return std::string(s);
+
+	std::string out;
+	out.resize(alen - 1);
+	WideCharToMultiByte(CP_ACP, 0, ws.c_str(), -1, &out[0], alen, NULL, NULL);
+	return out;
+}
+#endif
 
 //-----------
 //overclocking-related
@@ -116,25 +168,25 @@ bool AutoSS = false;        //Flagged true when the first auto-savestate is made
 bool movieSubtitles = true; //Toggle for displaying movie subtitles
 bool DebuggerWasUpdated = false; //To prevent the debugger from updating things without being updated.
 bool AutoResumePlay = false;
-char romNameWhenClosingEmulator[2048] = {0};
+char romNameWhenClosingEmulator[2048] = { 0 };
 static unsigned int pauseTimer = 0;
 
 
 FCEUGI::FCEUGI()
 	: filename(0),
-	  archiveFilename(0) 
+	archiveFilename(0)
 {
 	//printf("%08x",opsize); // WTF?!
 }
 
-FCEUGI::~FCEUGI() 
+FCEUGI::~FCEUGI()
 {
-	if (filename) 
+	if (filename)
 	{
 		free(filename);
 		filename = NULL;
 	}
-	if (archiveFilename) 
+	if (archiveFilename)
 	{
 		free(archiveFilename);
 		archiveFilename = NULL;
@@ -150,7 +202,8 @@ bool CheckFileExists(const char* filename) {
 	if (test.fail()) {
 		test.close();
 		return false;
-	} else {
+	}
+	else {
 		test.close();
 		return true;
 	}
@@ -162,11 +215,12 @@ void FCEU_TogglePPU(void) {
 		FCEU_DispMessage("New PPU loaded", 0);
 		FCEUI_printf("New PPU loaded");
 		overclock_enabled = 0;
-	} else {
+	}
+	else {
 		FCEU_DispMessage("Old PPU loaded", 0);
 		FCEUI_printf("Old PPU loaded");
 	}
-	normalscanlines = (dendy ? 290 : 240)+newppu; // use flag as number!
+	normalscanlines = (dendy ? 290 : 240) + newppu; // use flag as number!
 #ifdef __WIN_DRIVER__
 	SetMainWindowText();
 #endif
@@ -217,7 +271,7 @@ static void FCEU_CloseGame(void)
 		ResetExState(0, 0);
 
 		//clear screen when game is closed
-		extern uint8 *XBuf;
+		extern uint8* XBuf;
 		if (XBuf)
 			memset(XBuf, 0, 256 * 256);
 
@@ -243,29 +297,29 @@ static void FCEU_CloseGame(void)
 uint64 timestampbase;
 
 
-FCEUGI *GameInfo = NULL;
+FCEUGI* GameInfo = NULL;
 
 void (*GameInterface)(GI h);
 void (*GameStateRestore)(int version);
 
 readfunc ARead[0x10000];
 writefunc BWrite[0x10000];
-static readfunc *AReadG;
-static writefunc *BWriteG;
+static readfunc* AReadG;
+static writefunc* BWriteG;
 static int RWWrap = 0;
 
 //mbg merge 7/18/06 docs
 //bit0 indicates whether emulation is paused
 //bit1 indicates whether emulation is in frame step mode
 int EmulationPaused = 0;
-bool frameAdvanceRequested=false;
+bool frameAdvanceRequested = false;
 int frameAdvance_Delay_count = 0;
 int frameAdvance_Delay = FRAMEADVANCE_DELAY_DEFAULT;
 
 //indicates that the emulation core just frame advanced (consumed the frame advance state and paused)
 bool JustFrameAdvanced = false;
 
-static int *AutosaveStatus; //is it safe to load Auto-savestate
+static int* AutosaveStatus; //is it safe to load Auto-savestate
 static int AutosaveIndex = 0; //which Auto-savestate we're on
 int AutosaveQty = 4; // Number of Autosaves to store
 int AutosaveFrequency = 256; // Number of frames between autosaves
@@ -274,7 +328,7 @@ int AutosaveFrequency = 256; // Number of frames between autosaves
 int EnableAutosave = 0;
 
 ///a wrapper for unzip.c
-extern "C" FILE *FCEUI_UTF8fopen_C(const char *n, const char *m) {
+extern "C" FILE* FCEUI_UTF8fopen_C(const char* n, const char* m) {
 	return ::FCEUD_UTF8fopen(n, m);
 }
 
@@ -360,7 +414,7 @@ void SetWriteHandler(int32 start, int32 end, writefunc func) {
 			BWrite[x] = func;
 }
 
-uint8 *RAM;
+uint8* RAM;
 
 //---------
 //windows might need to allocate these differently, so we have some special code
@@ -371,7 +425,7 @@ static void AllocBuffers() {
 
 static void FreeBuffers() {
 	FCEU_free(RAM);
-    RAM = NULL;
+	RAM = NULL;
 }
 //------
 
@@ -414,17 +468,17 @@ void ResetGameLoaded(void) {
 	default_palette_selection = 0;
 }
 
-int UNIFLoad(const char *name, FCEUFILE *fp);
-int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode);
-int FDSLoad(const char *name, FCEUFILE *fp);
-int NSFLoad(const char *name, FCEUFILE *fp);
+int UNIFLoad(const char* name, FCEUFILE* fp);
+int iNESLoad(const char* name, FCEUFILE* fp, int OverwriteVidMode);
+int FDSLoad(const char* name, FCEUFILE* fp);
+int NSFLoad(const char* name, FCEUFILE* fp);
 
 //name should be UTF-8, hopefully, or else there may be trouble
-FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silent)
+FCEUGI* FCEUI_LoadGameVirtual(const char* name, int OverwriteVidMode, bool silent)
 {
 	//----------
 	//attempt to open the files
-	FCEUFILE *fp;
+	FCEUFILE* fp;
 	std::string fullname;	// this name contains both archive name and ROM file name
 	int lastpal = PAL;
 	int lastdendy = dendy;
@@ -435,13 +489,38 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 	// currently there's only one situation:
 	// the user clicked cancel form the open from archive dialog
 	int userCancel = 0;
-	fp = FCEU_fopen(name, LoadedRomFNamePatchToUse[0] ? LoadedRomFNamePatchToUse : nullptr, "rb", 0, -1, romextensions, &userCancel);
+	const char* openName = name;
+	std::string utf8FallbackName;
+	fp = FCEU_fopen(openName, LoadedRomFNamePatchToUse[0] ? LoadedRomFNamePatchToUse : nullptr, "rb", 0, -1, romextensions, &userCancel);
+
+#ifdef __WIN_DRIVER__
+	// Some older Win32 call sites still pass paths in the system ANSI code page.
+	// Internally FCEUX wants UTF-8 paths, so retry once after ACP -> UTF-8 conversion.
+	if (!fp && name && *name)
+	{
+		utf8FallbackName = FCEUWinACPToUTF8(name);
+		if (!utf8FallbackName.empty() && utf8FallbackName != name)
+		{
+			userCancel = 0;
+			fp = FCEU_fopen(utf8FallbackName.c_str(), LoadedRomFNamePatchToUse[0] ? LoadedRomFNamePatchToUse : nullptr, "rb", 0, -1, romextensions, &userCancel);
+			if (fp)
+				openName = utf8FallbackName.c_str();
+		}
+	}
+#endif
 
 	if (!fp)
 	{
 		// Although !fp, if the operation was canceled from archive select dialog box, don't show the error message;
 		if (!silent && !userCancel)
+		{
+#ifdef __WIN_DRIVER__
+			std::string displayName = FCEUWinUTF8ToACP(openName ? openName : name);
+			FCEU_PrintError("Error opening \"%s\"!", displayName.c_str());
+#else
 			FCEU_PrintError("Error opening \"%s\"!", name);
+#endif
+		}
 
 		return 0;
 	}
@@ -453,13 +532,20 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 	}
 	else
 	{
-		fullname.assign(name);
+		fullname.assign(openName);
 	}
 
 	// reset loaded game BEFORE it's loading.
 	ResetGameLoaded();
 	//file opened ok. start loading.
+#ifdef __WIN_DRIVER__
+	{
+		std::string fullnameDisplay = FCEUWinUTF8ToACP(fullname.c_str());
+		FCEU_printf("Loading %s...\n\n", fullnameDisplay.c_str());
+	}
+#else
 	FCEU_printf("Loading %s...\n\n", fullname.c_str());
+#endif
 	GetFileBase(fp->filename.c_str());
 	//reset parameters so they're cleared just in case a format's loader doesn't know to do the clearing
 	MasterRomInfoParams = TMasterRomInfoParams();
@@ -471,7 +557,7 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 
 	FCEU_CloseGame();
 	GameInfo = new FCEUGI();
-	memset( (void*)GameInfo, 0, sizeof(FCEUGI));
+	memset((void*)GameInfo, 0, sizeof(FCEUGI));
 
 	GameInfo->filename = strdup(fp->filename.c_str());
 	if (fp->archiveFilename != "")
@@ -488,7 +574,7 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 	GameInfo->cspecial = SIS_NONE;
 
 	//try to load each different format
-	bool FCEUXLoad(const char *name, FCEUFILE * fp);
+	bool FCEUXLoad(const char* name, FCEUFILE * fp);
 
 	int load_result;
 	load_result = iNESLoad(fullname.c_str(), fp, OverwriteVidMode);
@@ -503,7 +589,7 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 				load_result = FDSLoad(fullname.c_str(), fp);
 			}
 		}
-	}	
+	}
 	if (load_result == LOADER_OK)
 	{
 
@@ -521,8 +607,8 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 		if (OverwriteVidMode)
 			FCEU_ResetVidSys();
 
-		if (GameInfo->type != GIT_NSF && 
-			FSettings.GameGenie && 
+		if (GameInfo->type != GIT_NSF &&
+			FSettings.GameGenie &&
 			FCEU_OpenGenie())
 		{
 			FCEUI_SetGameGenie(false);
@@ -598,7 +684,7 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 
 	FCEU_fclose(fp);
 
-	if ( FCEU_StateRecorderIsEnabled() )
+	if (FCEU_StateRecorderIsEnabled())
 	{
 		FCEU_StateRecorderStart();
 	}
@@ -606,7 +692,7 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 	return GameInfo;
 }
 
-FCEUGI *FCEUI_LoadGame(const char *name, int OverwriteVidMode, bool silent)
+FCEUGI* FCEUI_LoadGame(const char* name, int OverwriteVidMode, bool silent)
 {
 	return FCEUI_LoadGameVirtual(name, OverwriteVidMode, silent);
 }
@@ -653,9 +739,9 @@ bool FCEUI_Initialize() {
 }
 
 void FCEUI_Kill(void) {
-	#ifdef _S9XLUA_H
+#ifdef _S9XLUA_H
 	FCEU_LuaStop();
-	#endif
+#endif
 	FCEU_KillVirtualVideo();
 	FCEU_KillGenie();
 	FreeBuffers();
@@ -665,7 +751,7 @@ int rapidAlternator = 0;
 //int AutoFirePattern[8] = { 1, 0, 0, 0, 0, 0, 0, 0 };
 int AutoFirePatternLength = 2;
 
-void SetAutoFirePattern(int onframes, int offframes) 
+void SetAutoFirePattern(int onframes, int offframes)
 {
 	//int i;
 	//for (i = 0; i < onframes && i < 8; i++) {
@@ -685,13 +771,13 @@ void SetAutoFirePattern(int onframes, int offframes)
 	AFon = onframes; AFoff = offframes;
 }
 
-void GetAutoFirePattern( int *onframes, int *offframes)
+void GetAutoFirePattern(int* onframes, int* offframes)
 {
-	if ( onframes )
+	if (onframes)
 	{
 		*onframes = AFon;
 	}
-	if ( offframes )
+	if (offframes)
 	{
 		*offframes = AFoff;
 	}
@@ -708,7 +794,7 @@ bool GetAutoFireState(int btnIdx)
 	return rapidAlternator;
 }
 
-void AutoFire(void) 
+void AutoFire(void)
 {
 	static int counter = 0;
 	if (justLagged == false)
@@ -718,16 +804,16 @@ void AutoFire(void)
 	}
 	//If recording a movie, use the frame # for the autofire so the offset
 	//doesn't get screwed up when loading.
-	if (FCEUMOV_Mode(MOVIEMODE_RECORD | MOVIEMODE_PLAY)) 
+	if (FCEUMOV_Mode(MOVIEMODE_RECORD | MOVIEMODE_PLAY))
 	{
 		//rapidAlternator = AutoFirePattern[(AutoFireOffset + FCEUMOV_GetFrame()) % AutoFirePatternLength]; //adelikat: TODO: Think through this, MOVIEMODE_FINISHED should not use movie data for auto-fire?
 		//adelikat: TODO: Think through this, MOVIEMODE_FINISHED should not use movie data for auto-fire?
-		rapidAlternator = ( (AutoFireOffset + FCEUMOV_GetFrame()) % AutoFirePatternLength ) < AFon; 
+		rapidAlternator = ((AutoFireOffset + FCEUMOV_GetFrame()) % AutoFirePatternLength) < AFon;
 	}
 	else
 	{
 		//rapidAlternator = AutoFirePattern[(AutoFireOffset + counter) % AutoFirePatternLength];
-		rapidAlternator = ( (AutoFireOffset + counter) % AutoFirePatternLength ) < AFon;
+		rapidAlternator = ((AutoFireOffset + counter) % AutoFirePatternLength) < AFon;
 	}
 }
 
@@ -741,7 +827,7 @@ extern unsigned int frameAdvHoldTimer;
 ///Emulates a single frame.
 
 ///Skip may be passed in, if FRAMESKIP is #defined, to cause this to emulate more than one frame
-void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int skip) {
+void FCEUI_Emulate(uint8** pXBuf, int32** SoundBuf, int32* SoundBufSize, int skip) {
 	FCEU_PROFILE_FUNC(prof, "Emulate Single Frame");
 	//skip initiates frame skip if 1, or frame skip and sound skip if 2
 	FCEU_MAYBE_UNUSED int r;
@@ -754,15 +840,15 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 #ifdef __QT_DRIVER__
 		uint32_t frameAdvanceDelayScaled = frameAdvance_Delay * (PAL ? 20 : 16);
 
-		if ( frameAdvanceDelayScaled < 1 )
+		if (frameAdvanceDelayScaled < 1)
 		{
 			frameAdvanceDelayScaled = 1;
 		}
-		if ( (frameAdvance_Delay_count == 0) || (frameAdvHoldTimer >= frameAdvanceDelayScaled) )
+		if ((frameAdvance_Delay_count == 0) || (frameAdvHoldTimer >= frameAdvanceDelayScaled))
 		{
 			EmulationPaused = EMULATIONPAUSED_FA;
 		}
-		if ( static_cast<unsigned int>(frameAdvance_Delay_count) < frameAdvanceDelayScaled)
+		if (static_cast<unsigned int>(frameAdvance_Delay_count) < frameAdvanceDelayScaled)
 		{
 			frameAdvance_Delay_count++;
 		}
@@ -803,7 +889,8 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 			RefreshThrottleFPS();
 		}
 #endif
-	} else
+	}
+	else
 	{
 #ifdef __WIN_DRIVER__
 		if (fps_scale_frameadvance > 0)
@@ -813,10 +900,10 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 			RefreshThrottleFPS();
 		}
 #endif
-		if (EmulationPaused & (EMULATIONPAUSED_PAUSED | EMULATIONPAUSED_TIMER) )
+		if (EmulationPaused & (EMULATIONPAUSED_PAUSED | EMULATIONPAUSED_TIMER))
 		{
 			// emulator is paused
-			memcpy(XBuf, XBackBuf, 256*256);
+			memcpy(XBuf, XBackBuf, 256 * 256);
 			FCEU_PutImage();
 			*pXBuf = XBuf;
 			*SoundBuf = WaveFinal;
@@ -869,7 +956,7 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 	if (KillFCEUXonFrame && (FCEUMOV_GetFrame() >= KillFCEUXonFrame))
 		DoFCEUExit();
 #else
-		extern int KillFCEUXonFrame;
+	extern int KillFCEUXonFrame;
 	if (KillFCEUXonFrame && (FCEUMOV_GetFrame() >= KillFCEUXonFrame))
 		exit(0);
 #endif
@@ -882,27 +969,29 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 	if (skip == 2) { //If skip = 2, then bypass sound
 		*SoundBuf = 0;
 		*SoundBufSize = 0;
-	} else {
+	}
+	else {
 		*SoundBuf = WaveFinal;
 		*SoundBufSize = ssize;
 	}
 
 	if ((EmulationPaused & EMULATIONPAUSED_FA) && (!frameAdvanceLagSkip || !lagFlag))
-	//Lots of conditions here.  EmulationPaused & EMULATIONPAUSED_FA must be true.  In addition frameAdvanceLagSkip or lagFlag must be false
-	// When Frame Advance is held, emulator is automatically paused after emulating one frame (or several lag frames)
+		//Lots of conditions here.  EmulationPaused & EMULATIONPAUSED_FA must be true.  In addition frameAdvanceLagSkip or lagFlag must be false
+		// When Frame Advance is held, emulator is automatically paused after emulating one frame (or several lag frames)
 	{
 		EmulationPaused = EMULATIONPAUSED_PAUSED;		   // restore EMULATIONPAUSED_PAUSED flag and clear EMULATIONPAUSED_FA flag
 		JustFrameAdvanced = true;
-		#ifdef __WIN_DRIVER__
+#ifdef __WIN_DRIVER__
 		if (soundoptions & SO_MUTEFA)  //mute the frame advance if the user requested it
 			*SoundBufSize = 0;         //keep sound muted
-		#endif
+#endif
 	}
 
 	if (lagFlag) {
 		lagCounter++;
 		justLagged = true;
-	} else justLagged = false;
+	}
+	else justLagged = false;
 
 	if (movieSubtitles)
 		ProcessSubtitles();
@@ -924,7 +1013,7 @@ void ResetNES(void) {
 	X6502_Reset();
 
 	// clear back baffer
-	extern uint8 *XBackBuf;
+	extern uint8* XBackBuf;
 	memset(XBackBuf, 0, 256 * 256);
 
 	FCEU_DispMessage("Reset", 0);
@@ -948,14 +1037,14 @@ static inline u64 xoroshiro128plus_rotl(const u64 x, int k) {
 u64 xoroshiro128plus_s[2];
 void xoroshiro128plus_seed(u32 input)
 {
-//http://xoroshiro.di.unimi.it/splitmix64.c
+	//http://xoroshiro.di.unimi.it/splitmix64.c
 	u64 x = input;
 
 	u64 z = (x += 0x9e3779b97f4a7c15);
 	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
 	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
 	xoroshiro128plus_s[0] = z ^ (z >> 31);
-	
+
 	z = (x += 0x9e3779b97f4a7c15);
 	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
 	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
@@ -975,21 +1064,21 @@ u64 xoroshiro128plus_next() {
 	return result;
 }
 
-void FCEU_MemoryRand(uint8 *ptr, uint32 size, bool default_zero) {
+void FCEU_MemoryRand(uint8* ptr, uint32 size, bool default_zero) {
 	int x = 0;
 
 	while (size) {
 		uint8 v = 0;
 		switch (RAMInitOption)
 		{
-			default:
-			case 0:
-				if (!default_zero) v = (x & 4) ? 0xFF : 0x00;
-				else               v = 0x00;
-				break;
-			case 1: v = 0xFF; break;
-			case 2: v = 0x00; break;
-			case 3: v = (u8)(xoroshiro128plus_next()); break;
+		default:
+		case 0:
+			if (!default_zero) v = (x & 4) ? 0xFF : 0x00;
+			else               v = 0x00;
+			break;
+		case 1: v = 0xFF; break;
+		case 2: v = 0x00; break;
+		case 3: v = (u8)(xoroshiro128plus_next()); break;
 
 			// the default is this 8 byte pattern: 00 00 00 00 FF FF FF FF
 			// it has been used in FCEUX since time immemorial
@@ -1009,7 +1098,7 @@ void FCEU_MemoryRand(uint8 *ptr, uint32 size, bool default_zero) {
 	}
 }
 
-void hand(X6502 *X, int type, uint32 A) {
+void hand(X6502* X, int type, uint32 A) {
 }
 
 void PowerNES(void) {
@@ -1018,7 +1107,7 @@ void PowerNES(void) {
 
 	//reseed random, unless we're in a movie
 	extern int disableBatteryLoading;
-	if(FCEUMOV_Mode(MOVIEMODE_INACTIVE) && !disableBatteryLoading)
+	if (FCEUMOV_Mode(MOVIEMODE_INACTIVE) && !disableBatteryLoading)
 	{
 		RAMInitSeed = rand() ^ (u32)xoroshiro128plus_next();
 	}
@@ -1064,7 +1153,7 @@ void PowerNES(void) {
 	FCEU_PowerCheats();
 	LagCounterReset();
 	// clear back buffer
-	extern uint8 *XBackBuf;
+	extern uint8* XBackBuf;
 	memset(XBackBuf, 0, 256 * 256);
 
 #ifdef __WIN_DRIVER__
@@ -1082,7 +1171,8 @@ void FCEU_ResetVidSys(void) {
 	else if (GameInfo->vidsys == GIV_PAL) {
 		w = 1;
 		dendy = 0;
-	} else
+	}
+	else
 		w = FSettings.PAL;
 
 	PAL = w ? 1 : 0;
@@ -1093,7 +1183,7 @@ void FCEU_ResetVidSys(void) {
 	if (newppu)
 		overclock_enabled = 0;
 
-	normalscanlines = (dendy ? 290 : 240)+newppu; // use flag as number!
+	normalscanlines = (dendy ? 290 : 240) + newppu; // use flag as number!
 	totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
 	FCEUPPU_SetVideoSystem(w || dendy);
 	SetSoundVariables();
@@ -1101,7 +1191,7 @@ void FCEU_ResetVidSys(void) {
 
 FCEUS FSettings;
 
-void FCEU_printf( __FCEU_PRINTF_FORMAT const char *format, ...)
+void FCEU_printf(__FCEU_PRINTF_FORMAT const char* format, ...)
 {
 	char temp[2048];
 
@@ -1112,7 +1202,7 @@ void FCEU_printf( __FCEU_PRINTF_FORMAT const char *format, ...)
 	FCEUD_Message(temp);
 
 #if 0
-	FILE *ofile;
+	FILE* ofile;
 	ofile = fopen("stdout.txt", "ab");
 	fwrite(temp, 1, strlen(temp), ofile);
 	fclose(ofile);
@@ -1121,7 +1211,7 @@ void FCEU_printf( __FCEU_PRINTF_FORMAT const char *format, ...)
 	va_end(ap);
 }
 
-void FCEU_PrintError( __FCEU_PRINTF_FORMAT const char *format, ...)
+void FCEU_PrintError(__FCEU_PRINTF_FORMAT const char* format, ...)
 {
 	char temp[2048];
 
@@ -1142,7 +1232,8 @@ void FCEUI_SetRenderedLines(int ntscf, int ntscl, int palf, int pall) {
 	if (PAL || dendy) {
 		FSettings.FirstSLine = FSettings.UsrFirstSLine[1];
 		FSettings.LastSLine = FSettings.UsrLastSLine[1];
-	} else {
+	}
+	else {
 		FSettings.FirstSLine = FSettings.UsrFirstSLine[0];
 		FSettings.LastSLine = FSettings.UsrLastSLine[0];
 	}
@@ -1157,7 +1248,7 @@ void FCEUI_SetVidSystem(int a) {
 	}
 }
 
-int FCEUI_GetCurrentVidSystem(int *slstart, int *slend) {
+int FCEUI_GetCurrentVidSystem(int* slstart, int* slend) {
 	if (slstart)
 		*slstart = FSettings.FirstSLine;
 	if (slend)
@@ -1169,11 +1260,11 @@ int  FCEUI_GetRegion(void)
 {
 	int region;
 
-	if ( pal_emulation )
+	if (pal_emulation)
 	{
 		region = 1;
 	}
-	else if ( dendy )
+	else if (dendy)
 	{
 		region = 2;
 	}
@@ -1184,42 +1275,42 @@ int  FCEUI_GetRegion(void)
 	return region;
 }
 
-void FCEUI_SetRegion(int region, int notify) 
+void FCEUI_SetRegion(int region, int notify)
 {
 	switch (region) {
-		case 0: // NTSC
-			normalscanlines = 240;
-			pal_emulation = 0;
-			dendy = 0;
+	case 0: // NTSC
+		normalscanlines = 240;
+		pal_emulation = 0;
+		dendy = 0;
 
-			if (notify)
-			{
-				FCEU_DispMessage("NTSC mode set", 0);
-				FCEUI_printf("NTSC mode set\n");
-			}
-			break;
-		case 1: // PAL
-			normalscanlines = 240;
-			pal_emulation = 1;
-			dendy = 0;
+		if (notify)
+		{
+			FCEU_DispMessage("NTSC mode set", 0);
+			FCEUI_printf("NTSC mode set\n");
+		}
+		break;
+	case 1: // PAL
+		normalscanlines = 240;
+		pal_emulation = 1;
+		dendy = 0;
 
-			if (notify)
-			{
-				FCEU_DispMessage("PAL mode set", 0);
-				FCEUI_printf("PAL mode set\n");
-			}
-			break;
-		case 2: // Dendy
-			normalscanlines = 290;
-			pal_emulation = 0;
-			dendy = 1;
+		if (notify)
+		{
+			FCEU_DispMessage("PAL mode set", 0);
+			FCEUI_printf("PAL mode set\n");
+		}
+		break;
+	case 2: // Dendy
+		normalscanlines = 290;
+		pal_emulation = 0;
+		dendy = 1;
 
-			if (notify)
-			{
-				FCEU_DispMessage("Dendy mode set", 0);
-				FCEUI_printf("Dendy mode set\n");
-			}
-			break;
+		if (notify)
+		{
+			FCEU_DispMessage("Dendy mode set", 0);
+			FCEUI_printf("Dendy mode set\n");
+		}
+		break;
 	}
 	normalscanlines += newppu;
 	totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
@@ -1268,7 +1359,7 @@ void FCEUI_ClearEmulationFrameStepped()
 //ideally maybe we shouldnt be using this, but i need it for quick merging
 void FCEUI_SetEmulationPaused(int val) {
 	EmulationPaused = val;
-	if(EmulationPaused)
+	if (EmulationPaused)
 		FCEUD_FlushTrace();
 }
 
@@ -1276,7 +1367,7 @@ void FCEUI_ToggleEmulationPause(void)
 {
 	EmulationPaused = (EmulationPaused & EMULATIONPAUSED_PAUSED) ^ EMULATIONPAUSED_PAUSED;
 	DebuggerWasUpdated = false;
-	if(EmulationPaused)
+	if (EmulationPaused)
 		FCEUD_FlushTrace();
 }
 
@@ -1322,7 +1413,7 @@ void UpdateAutosave(void) {
 	if (!EnableAutosave || turbo)
 		return;
 
-	char * f;
+	char* f;
 	if (++AutosaveCounter >= AutosaveFrequency) {
 		AutosaveCounter = 0;
 		AutosaveIndex = (AutosaveIndex + 1) % AutosaveQty;
@@ -1340,11 +1431,11 @@ void FCEUI_RewindToLastAutosave(void) {
 		return;
 
 	if (AutosaveStatus[AutosaveIndex] == 1) {
-		char * f;
+		char* f;
 		f = strdup(FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0).c_str());
 		FCEUSS_Load(f);
 		free(f);
-        f = NULL;
+		f = NULL;
 
 		//Set pointer to previous available slot
 		if (AutosaveStatus[(AutosaveIndex + AutosaveQty - 1) % AutosaveQty] == 1) {
@@ -1430,26 +1521,26 @@ bool FCEU_IsValidUI(EFCEUI ui) {
 
 class FCEUXCart {
 public:
-int mirroring;
-int chrPages, prgPages;
-uint32 chrSize, prgSize;
-char* CHR, *PRG;
+	int mirroring;
+	int chrPages, prgPages;
+	uint32 chrSize, prgSize;
+	char* CHR, * PRG;
 
-FCEUXCart()
-	: CHR(0)
-	, PRG(0) {
-}
+	FCEUXCart()
+		: CHR(0)
+		, PRG(0) {
+	}
 
-~FCEUXCart() {
-	if (CHR) delete[] CHR;
-	if (PRG) delete[] PRG;
-}
+	~FCEUXCart() {
+		if (CHR) delete[] CHR;
+		if (PRG) delete[] PRG;
+	}
 
-virtual void Power() {
-}
+	virtual void Power() {
+	}
 
 protected:
-//void SetReadHandler(int32 start, int32 end, readfunc func) {
+	//void SetReadHandler(int32 start, int32 end, readfunc func) {
 };
 
 FCEUXCart* cart = 0;
@@ -1467,34 +1558,34 @@ FCEUXCart* cart = 0;
 
 class NROM : FCEUXCart {
 public:
-virtual void Power() {
-	SetReadHandler(0x8000, 0xFFFF, CartBR);
-	setprg16(0x8000, 0);
-	setprg16(0xC000, ~0);
-	setchr8(0);
+	virtual void Power() {
+		SetReadHandler(0x8000, 0xFFFF, CartBR);
+		setprg16(0x8000, 0);
+		setprg16(0xC000, ~0);
+		setchr8(0);
 
-	vnapage[0] = NTARAM;
-	vnapage[2] = NTARAM;
-	vnapage[1] = NTARAM + 0x400;
-	vnapage[3] = NTARAM + 0x400;
-	PPUNTARAM = 0xF;
-}
+		vnapage[0] = NTARAM;
+		vnapage[2] = NTARAM;
+		vnapage[1] = NTARAM + 0x400;
+		vnapage[3] = NTARAM + 0x400;
+		PPUNTARAM = 0xF;
+	}
 };
 
 void FCEUXGameInterface(GI command)
 {
 	switch (command)
 	{
-		case GI_POWER:
-			cart->Power();
+	case GI_POWER:
+		cart->Power();
 		break;
-		default:
-			// Unhandled cases
+	default:
+		// Unhandled cases
 		break;
 	}
 }
 
-bool FCEUXLoad(const char *name, FCEUFILE *fp) {
+bool FCEUXLoad(const char* name, FCEUFILE* fp) {
 	//read ines header
 	iNES_HEADER head;
 	if (FCEU_fread(&head, 1, 16, fp) != 16)
