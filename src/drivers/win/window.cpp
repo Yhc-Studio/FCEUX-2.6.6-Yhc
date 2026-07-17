@@ -92,57 +92,6 @@ extern int32 fps_scale_unpaused;
 
 using namespace std;
 
-static std::wstring FCEUWinStringToWide(const char* s)
-{
-	if (!s || !*s)
-		return std::wstring();
-
-	int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, NULL, 0);
-	UINT cp = CP_UTF8;
-	DWORD flags = MB_ERR_INVALID_CHARS;
-
-	if (wlen <= 0)
-	{
-		cp = CP_ACP;
-		flags = 0;
-		wlen = MultiByteToWideChar(cp, flags, s, -1, NULL, 0);
-	}
-
-	if (wlen <= 0)
-		return std::wstring();
-
-	std::wstring out;
-	out.resize(wlen - 1);
-	MultiByteToWideChar(cp, flags, s, -1, &out[0], wlen);
-	return out;
-}
-
-static std::wstring FCEUWinStringToWide(const std::string& s)
-{
-	return FCEUWinStringToWide(s.c_str());
-}
-
-static std::string FCEUWinWideToUTF8(const wchar_t* ws)
-{
-	if (!ws || !*ws)
-		return std::string();
-
-	int len = WideCharToMultiByte(CP_UTF8, 0, ws, -1, NULL, 0, NULL, NULL);
-	if (len <= 0)
-		return std::string();
-
-	std::string out;
-	out.resize(len - 1);
-	WideCharToMultiByte(CP_UTF8, 0, ws, -1, &out[0], len, NULL, NULL);
-	return out;
-}
-
-static void FCEUWinSetWindowTextUTF8(HWND hwnd, const std::string& text)
-{
-	std::wstring wtext = FCEUWinStringToWide(text);
-	SetWindowTextW(hwnd, wtext.c_str());
-}
-
 //----Context Menu - Some dynamically added menu items
 #define FCEUX_CONTEXT_UNHIDEMENU        60000
 #define FCEUX_CONTEXT_LOADLASTLUA       60001
@@ -262,7 +211,7 @@ void SetMainWindowText()
 			str.append(StripPath(FCEUI_GetMovieName()));
 		}
 	}
-	FCEUWinSetWindowTextUTF8(hAppWnd, str);
+	SetWindowText(hAppWnd, str.c_str());
 }
 
 bool HasRecentFiles()
@@ -725,6 +674,9 @@ void UpdateRMenu(HMENU menu, char** strs, unsigned int mitem, unsigned int basei
 		if (tmp.size() > 128)
 			tmp = tmp.substr(0, 128);
 
+		moo.cbSize = sizeof(moo);
+		moo.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
+
 		//// Fill in the menu text.
 		//if(strlen(strs[x]) < 128)
 		//{
@@ -735,17 +687,12 @@ void UpdateRMenu(HMENU menu, char** strs, unsigned int mitem, unsigned int basei
 		//	sprintf(tmp, "&%d. %s", ( x + 1 ) % 10, strs[x] + strlen( strs[x] ) - 127);
 		//}
 
-		// Insert the menu item.  recent_files[] stores UTF-8 paths.
-		std::wstring wtmp = FCEUWinStringToWide(tmp);
-		MENUITEMINFOW moow;
-		memset(&moow, 0, sizeof(moow));
-		moow.cbSize = sizeof(moow);
-		moow.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
-		moow.cch = (UINT)wtmp.size();
-		moow.fType = MFT_STRING;
-		moow.wID = baseid + x;
-		moow.dwTypeData = (LPWSTR)wtmp.c_str();
-		InsertMenuItemW(menu, 0, TRUE, &moow);
+		// Insert the menu item
+		moo.cch = tmp.size();
+		moo.fType = 0;
+		moo.wID = baseid + x;
+		moo.dwTypeData = (LPSTR)tmp.c_str();
+		InsertMenuItem(menu, 0, 1, &moo);
 	}
 
 	DrawMenuBar(hAppWnd);
@@ -873,17 +820,15 @@ void UpdateLuaRMenu(HMENU menu, char** strs, unsigned int mitem, unsigned int ba
 		if (tmp.size() > 128)
 			tmp = tmp.substr(0, 128);
 
-		// Insert the menu item.  Recent Lua/movie filenames may contain UTF-8.
-		std::wstring wtmp = FCEUWinStringToWide(tmp);
-		MENUITEMINFOW moow;
-		memset(&moow, 0, sizeof(moow));
-		moow.cbSize = sizeof(moow);
-		moow.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
-		moow.cch = (UINT)wtmp.size();
-		moow.fType = MFT_STRING;
-		moow.wID = baseid + x;
-		moow.dwTypeData = (LPWSTR)wtmp.c_str();
-		InsertMenuItemW(menu, 0, TRUE, &moow);
+		moo.cbSize = sizeof(moo);
+		moo.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
+
+		// Insert the menu item
+		moo.cch = tmp.size();
+		moo.fType = 0;
+		moo.wID = baseid + x;
+		moo.dwTypeData = (LPSTR)tmp.c_str();
+		InsertMenuItem(menu, 0, 1, &moo);
 	}
 
 	DrawMenuBar(hAppWnd);
@@ -987,17 +932,15 @@ void UpdateMovieRMenu(HMENU menu, char** strs, unsigned int mitem, unsigned int 
 		if (tmp.size() > 128)
 			tmp = tmp.substr(0, 128);
 
-		// Insert the menu item.  Recent Lua/movie filenames may contain UTF-8.
-		std::wstring wtmp = FCEUWinStringToWide(tmp);
-		MENUITEMINFOW moow;
-		memset(&moow, 0, sizeof(moow));
-		moow.cbSize = sizeof(moow);
-		moow.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
-		moow.cch = (UINT)wtmp.size();
-		moow.fType = MFT_STRING;
-		moow.wID = baseid + x;
-		moow.dwTypeData = (LPWSTR)wtmp.c_str();
-		InsertMenuItemW(menu, 0, TRUE, &moow);
+		moo.cbSize = sizeof(moo);
+		moo.fMask = MIIM_DATA | MIIM_ID | MIIM_TYPE;
+
+		// Insert the menu item
+		moo.cch = tmp.size();
+		moo.fType = 0;
+		moo.wID = baseid + x;
+		moo.dwTypeData = (LPSTR)tmp.c_str();
+		InsertMenuItem(menu, 0, 1, &moo);
 	}
 
 	DrawMenuBar(hAppWnd);
@@ -1143,7 +1086,7 @@ void CloseGame()
 
 bool ALoad(const char* nameo, char* innerFilename, bool silent)
 {
-	FILE* patchTrial = FCEUD_UTF8fopen(nameo, "rb");
+	FILE* patchTrial = fopen(nameo, "rb");
 	if (patchTrial)
 	{
 		char sig[10] = { 0 };
@@ -1224,7 +1167,7 @@ bool ALoad(const char* nameo, char* innerFilename, bool silent)
 	}
 	else
 	{
-		FCEUWinSetWindowTextUTF8(hAppWnd, FCEU_NAME_AND_VERSION);	//adelikat: If game fails to load while a previous one was open, the previous would have been closed, so reflect that in the window caption
+		SetWindowText(hAppWnd, FCEU_NAME_AND_VERSION);	//adelikat: If game fails to load while a previous one was open, the previous would have been closed, so reflect that in the window caption
 		return false;
 	}
 
@@ -1242,35 +1185,33 @@ bool ALoad(const char* nameo, char* innerFilename, bool silent)
 /// @param initialdir Directory that's pre-selected in the Open File dialog.
 void LoadNewGamey(HWND hParent, const char* initialdir)
 {
-	const wchar_t filter[] = L"All usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf,*.zip,*.rar,*.7z,*.gz)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf;*.zip;*.rar;*.7z;*.gz\0All non-compressed usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf\0All Files (*.*)\0*.*\0\0";
-	wchar_t nameo[2048];
+	const char filter[] = "All usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf,*.zip,*.rar,*.7z,*.gz)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf;*.zip;*.rar;*.7z;*.gz\0All non-compressed usable files (*.nes,*.nsf,*.nsfe,*.fds,*.unf)\0*.nes;*.nsf;*.nsfe;*.fds;*.unf\0All Files (*.*)\0*.*\0\0";
+	char nameo[2048];
 
-	// Create the Open File dialog.  Use the W API so filenames never pass through
-	// the system ANSI codepage before being converted to FCEUX's internal UTF-8.
-	OPENFILENAMEW ofn;
+	// Create the Open File dialog
+	OPENFILENAME ofn;
 	memset(&ofn, 0, sizeof(ofn));
-
-	std::string titleUtf8 = std::string(FCEU_NAME) + " Open File...";
-	std::wstring titleW = FCEUWinStringToWide(titleUtf8);
-	std::string stdinitdir = FCEU_GetPath(FCEUMKF_ROMS);
-	std::wstring initdirW = FCEUWinStringToWide(initialdir ? initialdir : stdinitdir.c_str());
 
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hInstance = fceu_hInstance;
-	ofn.lpstrTitle = titleW.c_str();
+	ofn.lpstrTitle = FCEU_NAME" Open File...";
 	ofn.lpstrFilter = filter;
 	nameo[0] = 0;
 	ofn.hwndOwner = hParent;
 	ofn.lpstrFile = nameo;
-	ofn.nMaxFile = sizeof(nameo) / sizeof(nameo[0]);
+	ofn.nMaxFile = 256;
 	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY; //OFN_EXPLORER|OFN_ENABLETEMPLATE|OFN_ENABLEHOOK;
-	ofn.lpstrInitialDir = initdirW.empty() ? NULL : initdirW.c_str();
+	string stdinitdir = FCEU_GetPath(FCEUMKF_ROMS);
+
+	if (initialdir)					//adelikat: If a directory is specified in the function parameter, it should take priority
+		ofn.lpstrInitialDir = initialdir;
+	else							//adelikat: Else just use the override, if no override it will default to 0 - last directory used.
+		ofn.lpstrInitialDir = stdinitdir.c_str();
 
 	// Show the Open File dialog
-	if (GetOpenFileNameW(&ofn))
+	if (GetOpenFileName(&ofn))
 	{
-		std::string utf8Name = FCEUWinWideToUTF8(nameo);
-		ALoad(utf8Name.c_str());
+		ALoad(nameo);
 	}
 }
 
@@ -1652,12 +1593,27 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		goto proco;
 	case WM_DROPFILES:
 	{
-		UINT len = DragQueryFileW((HDROP)wParam, 0, NULL, 0) + 1;
-		wchar_t* wtmp = new wchar_t[len];
+		UINT len;
+
+		/*
+		 Using DragQueryFileW() and wcstombs() is not a proper way to convert Unicode string
+		 to a multibyte one, the system has its own codepage but wcstombs seems ignores it and only
+		 convert it to UTF-8. Similarly, functions such named FCEUD_UTF8fopen() acturally perform ANSI
+		 behaviour which follows the codepage of the system rather than UTF-8. I knew Windows with some
+		 languages has a very narrow codepage like 1252 and may have a problem to load a filename
+		 which contains extra characters without its convert, but the wcstombs() may corrupt the string
+		 to garbage text to the title and menu in some multibyte language Windows systems, it's due to
+		 the limitation of ANSI application and system itself, not the fault of the emulator, so there's
+		 no responsibility for the emulator to use a different API to solve it, just leave it as the
+		 default definition.
+		*/
+		len = DragQueryFile((HDROP)wParam, 0, 0, 0) + 1;
+		char* ftmp = new char[len];
 		{
-			DragQueryFileW((HDROP)wParam, 0, wtmp, len);
-			std::string fileDropped = FCEUWinWideToUTF8(wtmp);
-			delete[] wtmp;
+			DragQueryFile((HDROP)wParam, 0, ftmp, len);
+			// std::string fileDropped = wcstombs(wftmp);
+			std::string fileDropped = ftmp;
+			delete[] ftmp;
 			//adelikat:  Drag and Drop only checks file extension, the internal functions are responsible for file error checking
 
 			//-------------------------------------------------------
@@ -1760,6 +1716,15 @@ LRESULT FAR PASCAL AppWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 #ifdef _S9XLUA_H
 			else if (!(fileDropped.find(".lua") == string::npos) && (fileDropped.find(".lua") == fileDropped.length() - 4))
 			{
+				// HACK because luaL_loadfile doesn't work with multibyte paths
+				char* ftmp;
+				len = DragQueryFile((HDROP)wParam, 0, 0, 0) + 1;
+				if ((ftmp = (char*)malloc(len)))
+				{
+					DragQueryFile((HDROP)wParam, 0, ftmp, len);
+					fileDropped = ftmp;
+					free(ftmp);
+				}
 				FCEU_LoadLuaCode(fileDropped.c_str());
 				UpdateLuaConsole(fileDropped.c_str());
 			}
@@ -2993,28 +2958,24 @@ bool FCEUD_PauseAfterPlayback()
 
 void ChangeContextMenuItemText(int menuitem, string text, HMENU menu)
 {
-	std::wstring wtext = FCEUWinStringToWide(text);
-	MENUITEMINFOW moo;
-	memset(&moo, 0, sizeof(moo));
+	MENUITEMINFO moo;
 	moo.cbSize = sizeof(moo);
 	moo.fMask = MIIM_TYPE;
-	moo.fType = MFT_STRING;
-	moo.cch = (UINT)wtext.size();
-	moo.dwTypeData = (LPWSTR)wtext.c_str();
-	SetMenuItemInfoW(menu, menuitem, FALSE, &moo);
+	moo.cch = NULL;
+	GetMenuItemInfo(menu, menuitem, FALSE, &moo);
+	moo.dwTypeData = (LPSTR)text.c_str();
+	SetMenuItemInfo(menu, menuitem, FALSE, &moo);
 }
 
 void ChangeMenuItemText(int menuitem, string text)
 {
-	std::wstring wtext = FCEUWinStringToWide(text);
-	MENUITEMINFOW moo;
-	memset(&moo, 0, sizeof(moo));
+	MENUITEMINFO moo;
 	moo.cbSize = sizeof(moo);
 	moo.fMask = MIIM_TYPE;
-	moo.fType = MFT_STRING;
-	moo.cch = (UINT)wtext.size();
-	moo.dwTypeData = (LPWSTR)wtext.c_str();
-	SetMenuItemInfoW(fceumenu, menuitem, FALSE, &moo);
+	moo.cch = NULL;
+	GetMenuItemInfo(fceumenu, menuitem, FALSE, &moo);
+	moo.dwTypeData = (LPSTR)text.c_str();
+	SetMenuItemInfo(fceumenu, menuitem, FALSE, &moo);
 }
 
 string HOTKEYMENUINDEX::getQualifiedMenuText(FCEUMENU_INDEX menu_index) {

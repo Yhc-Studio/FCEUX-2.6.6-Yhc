@@ -93,59 +93,7 @@ extern void RefreshThrottleFPS();
 #include <cstdarg>
 #include <ctime>
 
-#ifdef __WIN_DRIVER__
-#include <windows.h>
-#endif
-
 using namespace std;
-
-#ifdef __WIN_DRIVER__
-static std::string FCEUWinACPToUTF8(const char* s)
-{
-	if (!s || !*s)
-		return std::string();
-
-	int wlen = MultiByteToWideChar(CP_ACP, 0, s, -1, NULL, 0);
-	if (wlen <= 0)
-		return std::string(s);
-
-	std::wstring ws;
-	ws.resize(wlen - 1);
-	MultiByteToWideChar(CP_ACP, 0, s, -1, &ws[0], wlen);
-
-	int u8len = WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), -1, NULL, 0, NULL, NULL);
-	if (u8len <= 0)
-		return std::string(s);
-
-	std::string out;
-	out.resize(u8len - 1);
-	WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), -1, &out[0], u8len, NULL, NULL);
-	return out;
-}
-
-static std::string FCEUWinUTF8ToACP(const char* s)
-{
-	if (!s || !*s)
-		return std::string();
-
-	int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, NULL, 0);
-	if (wlen <= 0)
-		return std::string(s);
-
-	std::wstring ws;
-	ws.resize(wlen - 1);
-	MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, &ws[0], wlen);
-
-	int alen = WideCharToMultiByte(CP_ACP, 0, ws.c_str(), -1, NULL, 0, NULL, NULL);
-	if (alen <= 0)
-		return std::string(s);
-
-	std::string out;
-	out.resize(alen - 1);
-	WideCharToMultiByte(CP_ACP, 0, ws.c_str(), -1, &out[0], alen, NULL, NULL);
-	return out;
-}
-#endif
 
 //-----------
 //overclocking-related
@@ -489,38 +437,13 @@ FCEUGI* FCEUI_LoadGameVirtual(const char* name, int OverwriteVidMode, bool silen
 	// currently there's only one situation:
 	// the user clicked cancel form the open from archive dialog
 	int userCancel = 0;
-	const char* openName = name;
-	std::string utf8FallbackName;
-	fp = FCEU_fopen(openName, LoadedRomFNamePatchToUse[0] ? LoadedRomFNamePatchToUse : nullptr, "rb", 0, -1, romextensions, &userCancel);
-
-#ifdef __WIN_DRIVER__
-	// Some older Win32 call sites still pass paths in the system ANSI code page.
-	// Internally FCEUX wants UTF-8 paths, so retry once after ACP -> UTF-8 conversion.
-	if (!fp && name && *name)
-	{
-		utf8FallbackName = FCEUWinACPToUTF8(name);
-		if (!utf8FallbackName.empty() && utf8FallbackName != name)
-		{
-			userCancel = 0;
-			fp = FCEU_fopen(utf8FallbackName.c_str(), LoadedRomFNamePatchToUse[0] ? LoadedRomFNamePatchToUse : nullptr, "rb", 0, -1, romextensions, &userCancel);
-			if (fp)
-				openName = utf8FallbackName.c_str();
-		}
-	}
-#endif
+	fp = FCEU_fopen(name, LoadedRomFNamePatchToUse[0] ? LoadedRomFNamePatchToUse : nullptr, "rb", 0, -1, romextensions, &userCancel);
 
 	if (!fp)
 	{
 		// Although !fp, if the operation was canceled from archive select dialog box, don't show the error message;
 		if (!silent && !userCancel)
-		{
-#ifdef __WIN_DRIVER__
-			std::string displayName = FCEUWinUTF8ToACP(openName ? openName : name);
-			FCEU_PrintError("Error opening \"%s\"!", displayName.c_str());
-#else
 			FCEU_PrintError("Error opening \"%s\"!", name);
-#endif
-		}
 
 		return 0;
 	}
@@ -532,20 +455,13 @@ FCEUGI* FCEUI_LoadGameVirtual(const char* name, int OverwriteVidMode, bool silen
 	}
 	else
 	{
-		fullname.assign(openName);
+		fullname.assign(name);
 	}
 
 	// reset loaded game BEFORE it's loading.
 	ResetGameLoaded();
 	//file opened ok. start loading.
-#ifdef __WIN_DRIVER__
-	{
-		std::string fullnameDisplay = FCEUWinUTF8ToACP(fullname.c_str());
-		FCEU_printf("Loading %s...\n\n", fullnameDisplay.c_str());
-	}
-#else
 	FCEU_printf("Loading %s...\n\n", fullname.c_str());
-#endif
 	GetFileBase(fp->filename.c_str());
 	//reset parameters so they're cleared just in case a format's loader doesn't know to do the clearing
 	MasterRomInfoParams = TMasterRomInfoParams();
