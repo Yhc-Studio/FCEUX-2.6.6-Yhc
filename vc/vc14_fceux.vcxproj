@@ -112,7 +112,7 @@
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\output64\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='PublicRelease|x64'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='PublicRelease|x64'">$(Platform)\$(Configuration)\</IntDir>
@@ -396,9 +396,11 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
       <PreprocessSuppressLineNumbers Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessSuppressLineNumbers>
     </ClCompile>
     <ClCompile Include="..\src\boards\09-034a.cpp" />
+    <ClCompile Include="..\src\boards\100.cpp" />
     <ClCompile Include="..\src\boards\103.cpp">
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)ass.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\src\boards\104.cpp" />
     <ClCompile Include="..\src\boards\106.cpp" />
     <ClCompile Include="..\src\boards\108.cpp" />
     <ClCompile Include="..\src\boards\112.cpp" />
@@ -407,7 +409,9 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\120.cpp" />
     <ClCompile Include="..\src\boards\121.cpp" />
     <ClCompile Include="..\src\boards\122.cpp" />
+    <ClCompile Include="..\src\boards\124.cpp" />
     <ClCompile Include="..\src\boards\126-422-534.cpp" />
+    <ClCompile Include="..\src\boards\127.cpp" />
     <ClCompile Include="..\src\boards\128.cpp" />
     <ClCompile Include="..\src\boards\12in1.cpp" />
     <ClCompile Include="..\src\boards\134.cpp" />
@@ -615,6 +619,7 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\546.cpp" />
     <ClCompile Include="..\src\boards\548.cpp" />
     <ClCompile Include="..\src\boards\549.cpp" />
+    <ClCompile Include="..\src\boards\55.cpp" />
     <ClCompile Include="..\src\boards\554.cpp" />
     <ClCompile Include="..\src\boards\556.cpp" />
     <ClCompile Include="..\src\boards\557.cpp" />
@@ -660,6 +665,7 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\60.cpp" />
     <ClCompile Include="..\src\boards\603-5052.cpp" />
     <ClCompile Include="..\src\boards\603.cpp" />
+    <ClCompile Include="..\src\boards\604.cpp" />
     <ClCompile Include="..\src\boards\605.cpp" />
     <ClCompile Include="..\src\boards\606.cpp" />
     <ClCompile Include="..\src\boards\607.cpp" />
@@ -685,14 +691,15 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\65.cpp" />
     <ClCompile Include="..\src\boards\67.cpp" />
     <ClCompile Include="..\src\boards\68.cpp" />
+    <ClCompile Include="..\src\boards\682.cpp" />
     <ClCompile Include="..\src\boards\69.cpp" />
     <ClCompile Include="..\src\boards\6_8_12_17_561_562.cpp" />
     <ClCompile Include="..\src\boards\71.cpp" />
     <ClCompile Include="..\src\boards\72.cpp" />
     <ClCompile Include="..\src\boards\733.cpp" />
     <ClCompile Include="..\src\boards\735.cpp" />
+    <ClCompile Include="..\src\boards\742.cpp" />
     <ClCompile Include="..\src\boards\746.cpp" />
-    <ClCompile Include="..\src\boards\748.cpp" />
     <ClCompile Include="..\src\boards\749.cpp" />
     <ClCompile Include="..\src\boards\751.cpp" />
     <ClCompile Include="..\src\boards\736.cpp" />
@@ -786,6 +793,7 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\boards\lh32.cpp" />
     <ClCompile Include="..\src\boards\lh51.cpp" />
     <ClCompile Include="..\src\boards\lh53.cpp" />
+    <ClCompile Include="..\src\boards\lpc_d6_synth.cpp" />
     <ClCompile Include="..\src\boards\mihunche.cpp" />
     <ClCompile Include="..\src\boards\mmc2and4.cpp" />
     <ClCompile Include="..\src\boards\msm6585.cpp" />
@@ -1333,6 +1341,7 @@ xcopy /y /d "$(ProjectDir)\..\src\drivers\win\7z_64.dll" "$(OutDir)"</Command>
     <ClInclude Include="..\src\boards\fifo.h" />
     <ClInclude Include="..\src\boards\flashrom.h" />
     <ClInclude Include="..\src\boards\latch.h" />
+    <ClInclude Include="..\src\boards\lpc_d6_synth.h" />
     <ClInclude Include="..\src\boards\msm6585.h" />
     <ClInclude Include="..\src\boards\vrcirq.h" />
     <ClInclude Include="..\src\cart.h" />
