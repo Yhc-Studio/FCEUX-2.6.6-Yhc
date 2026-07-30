@@ -416,6 +416,18 @@ uint8 READPAL_MOTHEROFALL(uint32 A)
 		return READPAL(A & 0x1F);
 }
 
+// Raw palette read used by NEWPPU's per-dot forced-blank snapshot.
+// Grayscale is applied later from the matching sampled $2001 value.
+static INLINE uint8 READPAL_MOTHEROFALL_NOGS(uint32 A)
+{
+	if (!(A & 3)) {
+		if (!(A & 0x0C))
+			return PALRAM[0x00];
+		return UPALRAM[((A & 0x0C) >> 2) - 1];
+	}
+	return PALRAM[A & 0x1F];
+}
+
 //this duplicates logic which is embedded in the ppu rendering code
 //which figures out where to get CHR data from depending on various hack modes
 //mostly involving mmc5.
@@ -920,8 +932,11 @@ static DECLFW(B2001) {
 		V = (V & 0x9F) | ((V & 0x40) >> 1) | ((V & 0x20) << 1);
 	PPUGenLatch = V;
 	PPU[1] = V;
-	if (V & 0xE0)
-		deemp = V >> 5;
+
+	// Keep the cached emphasis state synchronized even when bits 5-7
+	// are cleared.  The previous code left the last non-zero value in
+	// deemp after writing an emphasis value of zero.
+	deemp = V >> 5;
 }
 
 static DECLFW(B2002) {
@@ -2092,7 +2107,26 @@ void runppu(int x) {
 struct BGData {
 	struct Record {
 		uint8 nt, pecnt, at, pt[2], qtnt;
+
+		// Hardware $2001 value and final forced-blank base color sampled at
+		// each output dot.  Saving only the address is insufficient because
+		// Color 512 modifies palette RAM through $2007 while the eight-dot
+		// fetch batch is still running.
 		uint8 ppu1[8];
+		uint8 forcedBlankColor[8];
+
+		INLINE void SnapshotOutputState(int dot) {
+			const uint8 hardwareMask = PPU[1];
+			ppu1[dot] = hardwareMask;
+
+			uint8 color = READPAL_MOTHEROFALL_NOGS(0);
+			if (!(hardwareMask & 0x18)) {
+				const uint32 addr = ppur.get_2007access() & 0x3FFF;
+				if ((addr & 0x3F00) == 0x3F00)
+					color = READPAL_MOTHEROFALL_NOGS(addr & 0x1F);
+			}
+			forcedBlankColor[dot] = color;
+		}
 
 		INLINE void Read() {
 			NTRefreshAddr = RefreshAddr = ppur.get_ntread();
@@ -2104,75 +2138,71 @@ struct BGData {
 			}
 			pecnt = (RefreshAddr & 1) << 3;
 			nt = CALL_PPUREAD(RefreshAddr);
-			ppu1[0] = PPUMASK_VISUAL;
+			SnapshotOutputState(0);
 			runppu(1);
-			ppu1[1] = PPUMASK_VISUAL;
+			SnapshotOutputState(1);
 			runppu(1);
-
-
 
 			RefreshAddr = ppur.get_atread();
 			at = CALL_PPUREAD(RefreshAddr);
 
-			//modify at to get appropriate palette shift
 			if (ppur.vt & 2) at >>= 4;
 			if (ppur.ht & 2) at >>= 2;
 			at &= 0x03;
 			at <<= 2;
-			//horizontal scroll clocked at cycle 3 and then
-			//vertical scroll at 251
-			ppu1[2] = PPUMASK_VISUAL;
+
+			SnapshotOutputState(2);
 			runppu(1);
 			if (PPUON) {
 				ppur.increment_hsc();
 				if (ppur.status.cycle == 251)
 					ppur.increment_vs();
 			}
-			ppu1[3] = PPUMASK_VISUAL;
+			SnapshotOutputState(3);
 			runppu(1);
 
 			ppur.par = nt;
 			RefreshAddr = ppur.get_ptread();
 			if (PEC586Hack) {
 				pt[0] = CALL_PPUREAD(RefreshAddr | pecnt);
-				ppu1[4] = PPUMASK_VISUAL;
+				SnapshotOutputState(4);
 				runppu(1);
-				ppu1[5] = PPUMASK_VISUAL;
+				SnapshotOutputState(5);
 				runppu(1);
 				pt[1] = CALL_PPUREAD(RefreshAddr | pecnt);
-				ppu1[6] = PPUMASK_VISUAL;
+				SnapshotOutputState(6);
 				runppu(1);
-				ppu1[7] = PPUMASK_VISUAL;
+				SnapshotOutputState(7);
 				runppu(1);
 			}
 			else if (QTAIHack && (qtnt & 0x40)) {
 				pt[0] = *(CHRptr[0] + RefreshAddr);
-				ppu1[4] = PPUMASK_VISUAL;
+				SnapshotOutputState(4);
 				runppu(1);
-				ppu1[5] = PPUMASK_VISUAL;
+				SnapshotOutputState(5);
 				runppu(1);
 				RefreshAddr |= 8;
 				pt[1] = *(CHRptr[0] + RefreshAddr);
-				ppu1[6] = PPUMASK_VISUAL;
+				SnapshotOutputState(6);
 				runppu(1);
-				ppu1[7] = PPUMASK_VISUAL;
+				SnapshotOutputState(7);
 				runppu(1);
 			}
 			else {
 				if (ScreenON)
 					RENDER_LOG(RefreshAddr);
 				pt[0] = CALL_PPUREAD(RefreshAddr);
-				ppu1[4] = PPUMASK_VISUAL;
+				SnapshotOutputState(4);
 				runppu(1);
-				ppu1[5] = PPUMASK_VISUAL;
+				SnapshotOutputState(5);
 				runppu(1);
 				RefreshAddr |= 8;
 				if (ScreenON)
 					RENDER_LOG(RefreshAddr);
 				pt[1] = CALL_PPUREAD(RefreshAddr);
-				ppu1[6] = PPUMASK_VISUAL;
+				SnapshotOutputState(6);
 				runppu(1);
-				ppu1[7] = PPUMASK_VISUAL;
+				SnapshotOutputState(7);
 				runppu(1);
 			}
 		}
@@ -2181,11 +2211,13 @@ struct BGData {
 	Record main[34];	//one at the end is junk, it can never be rendered
 } bgdata;
 
-static inline int PaletteAdjustPixel(int pixel) {
-	if ((PPUMASK_VISUAL >> 5) == 0x7)
-		return (pixel & 0x3f) | 0xc0;
-	else if (PPUMASK_VISUAL & 0xE0)
-		return pixel | 0x40;
+static inline int PaletteAdjustPixel(int pixel, uint8 mask) {
+	const uint8 emphasis = (mask >> 5) & 0x07;
+
+	if (emphasis == 0x07)
+		return (pixel & 0x3F) | 0xC0;
+	else if (emphasis)
+		return (pixel & 0x3F) | 0x40;
 	else
 		return (pixel & 0x3F) | 0x80;
 }
@@ -2318,10 +2350,22 @@ int FCEUX_PPU_Loop(int skip) {
 					uint8* dptr = dtarget;
 					int rasterpos = xstart;
 
-					//check all the conditions that can cause things to render in these 8px
-					const bool renderspritenow = SpriteON && (xt > 0 || SpriteLeft8);
-					const bool renderbgnow = ScreenON && (xt > 0 || BGLeft8);
 					for (int xp = 0; xp < 8; xp++, rasterpos++, g_rasterpos++) {
+						const uint8 hardwareMask = bgdata.main[xt + 2].ppu1[xp];
+
+						// NEWPPU is the cycle-accurate hardware path.  Do not let the
+						// user-facing FCEUPPU_MaskEnabled display override erase the
+						// grayscale/emphasis bits recorded from $2001.  Color 512
+						// intentionally changes bits 5-7 between scanline groups;
+						// clearing them here makes every group repeat emphasis 0.
+						const uint8 sampledMask = hardwareMask;
+						const bool sampledScreenOn = (hardwareMask & 0x08) != 0;
+						const bool sampledSpriteOn = (hardwareMask & 0x10) != 0;
+						const bool forcedBlank = !sampledScreenOn && !sampledSpriteOn;
+						const bool renderbgnow = sampledScreenOn &&
+							(rasterpos >= 8 || (sampledMask & 0x02));
+						const bool renderspritenow = sampledSpriteOn &&
+							(rasterpos >= 8 || (sampledMask & 0x04));
 						//bg pos is different from raster pos due to its offsetability.
 						//so adjust for that here
 						const int bgpos = rasterpos + ppur.fh;
@@ -2331,24 +2375,18 @@ int FCEUX_PPU_Loop(int skip) {
 						uint8 pixel = 0;
 						uint8 pixelcolor = blank;
 
-						//according to qeed's doc, use palette 0 or $2006's value if it is & 0x3Fxx
-						if (!ScreenON && !SpriteON)
-						{
-							// if there's anything wrong with how we're doing this, someone please chime in
-							int addr = ppur.get_2007access();
-							if ((addr & 0x3F00) == 0x3F00)
-							{
-								pixel = addr & 0x1F;
-							}
-							pixelcolor = READPAL_MOTHEROFALL(pixel);
-						}
+						// During forced blank, use the palette value captured at this
+						// exact dot.  Looking up PALRAM later is incorrect because
+						// Color 512 writes new palette values during the same 8-dot batch.
+						if (forcedBlank)
+							pixelcolor = bgdata.main[xt + 2].forcedBlankColor[xp];
 
 						//generate the BG data
 						if (renderbgnow) {
 							uint8* pt = bgdata.main[bgtile].pt;
 							pixel = ((pt[0] >> (7 - bgpx)) & 1) | (((pt[1] >> (7 - bgpx)) & 1) << 1) | bgdata.main[bgtile].at;
 						}
-						if (renderbg)
+						if (!forcedBlank && renderbg)
 							pixelcolor = READPALNOGS(pixel);
 
 						//look for a sprite to be drawn
@@ -2398,21 +2436,13 @@ int FCEUX_PPU_Loop(int skip) {
 							}
 						}
 
-						//apply grayscale.. kind of clunky
-						//really we need to read the entire palette instead of just ppu1
-						//this will be needed for special color effects probably (very fine rainbows and whatnot?)
-						//are you allowed to chang the palette mid-line anyway? well you can definitely change the grayscale flag as we know from the FF1 "polygon" effect
-						if (bgdata.main[xt + 2].ppu1[xp] & 1)
+						if (sampledMask & 0x01)
 							pixelcolor &= 0x30;
 
-						//this does deemph stuff inside it.. which is probably wrong...
-						*ptr = PaletteAdjustPixel(pixelcolor);
+						*ptr++ = PaletteAdjustPixel(pixelcolor, sampledMask);
 
-						ptr++;
-
-						//grab deemph..
-						//I guess this works the same way as the grayscale, ideally?
-						*dptr++ = bgdata.main[xt + 2].ppu1[xp] >> 5;
+						// Store the same sampled emphasis bits used for XBuf.
+						*dptr++ = (sampledMask >> 5) & 0x07;
 					}
 				}
 			}

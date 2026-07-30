@@ -1593,9 +1593,6 @@
     <ClCompile Include="..\src\boards\406.cpp">
       <Filter>boards</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\boards\748.cpp">
-      <Filter>boards</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\boards\asic_mmc3.cpp">
       <Filter>boards</Filter>
     </ClCompile>
@@ -1938,6 +1935,60 @@
     <ClCompile Include="..\src\boards\800.cpp">
       <Filter>boards</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\boards\800_0.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\619.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\620.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\621.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\622.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\623.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\624.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\625.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\242.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\604.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\682.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\lpc_d6_synth.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\742.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\127.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\124.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\100.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\55.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\boards\104.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\drivers\common\args.h">
@@ -2076,9 +2127,6 @@
       <Filter>drivers\win</Filter>
     </ClInclude>
     <ClInclude Include="..\src\drivers\win\replay.h">
-      <Filter>drivers\win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\drivers\win\resource.h">
       <Filter>drivers\win</Filter>
     </ClInclude>
     <ClInclude Include="..\src\drivers\win\sound.h">
@@ -2518,11 +2566,18 @@
     <ClInclude Include="..\src\ines-correct.h">
       <Filter>include files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="..\src\drivers\win\res.rc">
+    <ClInclude Include="..\src\drivers\win\resource.h">
       <Filter>drivers\win</Filter>
-    </ResourceCompile>
+    </ClInclude>
+    <ClInclude Include="..\src\boards\800_0.h">
+      <Filter>boards</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\boards\800_base.h">
+      <Filter>boards</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\boards\lpc_d6_synth.h">
+      <Filter>boards</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\drivers\win\res\ICON_1.ico">
@@ -2861,5 +2916,10 @@
   <ItemGroup>
     <Image Include="..\src\drivers\win\res\bitmap21.bmp" />
     <Image Include="..\icons\fceux.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\src\drivers\win\res.rc">
+      <Filter>drivers\win</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

@@ -280,14 +280,49 @@ static void ApplyDeemphasisClassic(int entry, u8& r, u8& g, u8& b)
 
 static void ApplyDeemphasisComplete(pal* pal512)
 {
-	//for each deemph level beyond 0
-	for(int i=0,idx=0;i<8;i++)
+	// 第 0 组就是未经 emphasis 的基础 64 色。
+	for (int emphasis = 1; emphasis < 8; emphasis++)
 	{
-		//for each palette entry
-		for(int p=0;p<64;p++,idx++)
+		for (int color = 0; color < 64; color++)
 		{
-			pal512[idx] = pal512[p];
-			ApplyDeemphasisBisqwit(idx,pal512[idx].r,pal512[idx].g,pal512[idx].b);
+			const int dst = (emphasis << 6) | color;
+
+			float r = pal512[color].r;
+			float g = pal512[color].g;
+			float b = pal512[color].b;
+
+			/*
+			 * NTSC 2C02 的 emphasis 不影响 $xE 和 $xF。
+			 * $xD 是否受影响由具体 PPU 行为决定；这里保持受影响，
+			 * 与普通 2C02 路径一致。
+			 */
+			if ((color & 0x0F) <= 0x0D)
+			{
+				if (emphasis & 0x01)
+				{
+					g *= 0.84f;
+					b *= 0.84f;
+				}
+
+				if (emphasis & 0x02)
+				{
+					r *= 0.84f;
+					b *= 0.84f;
+				}
+
+				if (emphasis & 0x04)
+				{
+					r *= 0.84f;
+					g *= 0.84f;
+				}
+			}
+
+			pal512[dst].r =
+				static_cast<uint8>(r > 255.0f ? 255.0f : r);
+			pal512[dst].g =
+				static_cast<uint8>(g > 255.0f ? 255.0f : g);
+			pal512[dst].b =
+				static_cast<uint8>(b > 255.0f ? 255.0f : b);
 		}
 	}
 }

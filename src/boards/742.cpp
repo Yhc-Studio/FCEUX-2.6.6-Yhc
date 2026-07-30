@@ -1,20 +1,19 @@
 /* FCE Ultra - NES/Famicom Emulator
  *
- * NES 2.0 Mapper 742 -- TQY FPGA compatibility supervisor
- * Stage 3 integration implementation for FCEUX-2.6.6-Yhc.
+ * NES 2.0 Mapper 742 -- TQY FPGA 多映射器兼容监督器
+ * UNIF board name: TQY-MULTIGAME
  *
- * This revision follows the updated Mapper 742 specification:
- *   - $4104 bits 2/3 select the small PRG/CHR outer-bank ranges;
- *   - $4109 is the small CHR outer-bank selector;
- *   - Mapper 118 mirroring has priority over Mapper 154 mirroring,
- *     which in turn has priority over the native MMC3 mirroring register.
+ * 本文件在 Stage 3 的基础上按照最新版 Mapper 742 规格更新：
+ *   1. 新增 Mapper 18 ASIC 模拟模式（$4101 = $12）；
+ *   2. 新增独立 VRC6 扩展音频模式（$4102 = $05）；
+ *   3. 完整实现 VRC2/4、VRC6、VRC7 的地址响应位选择、单响应位补全、
+ *      缺省 #$03 回退，以及 $4104 bit 6 的响应位顺序交换；
+ *   4. 新增 $4104 bit 4/5 的全局镜像覆盖，并按照
+ *      $4104.4 > Mapper 118 > Mapper 154 > 原生镜像寄存器的优先级工作；
+ *   5. ExRAM 仅在 MMC5 与 Bandai FCG 主映射器模式下启用。
  *
- * Stage 3 adds a native-core bridge for MMC5, Bandai FCG, Namco 163,
- * Mapper 80, Sunsoft FME-7/Mapper 112, J.Y. Company, Magic Dragon, GTROM
- * and UNROM 512, plus a private Mapper 33/48 compatibility core. It also
- * routes the independently-selected MMC5,
- * Namco 163, Sunsoft 5B and VRC7 expansion-audio interfaces without giving
- * those audio engines ownership of the active primary mapper.
+ * 复杂 ASIC 仍通过 FCEUX 原有 Mapper 核心桥接，避免复制 MMC5、N163、
+ * FME-7、J.Y.、Mapper 18 等核心后产生两套行为不一致的实现。
  *
  * Copyright (C) 2026 Yhc-Studio contributors
  *
@@ -47,7 +46,7 @@ static uint8 activeMapperMode;
 static uint8 unsupportedMode;
 static uint8 mapper154Mirroring;
 
-/* MMC3-family supervisor state not exposed by the generic ASIC module. */
+/* 通用 MMC3 ASIC 模块没有公开的扩展寄存器状态。 */
 static uint8 mapper742MMC3Command;
 static uint8 mapper742MMC3WRAMControl;
 static uint8 mapper742ExtendedReg[11]; /* R0-R9, RF at index 10 */
@@ -56,7 +55,7 @@ static uint8 mapper742NesticlePRG[3];
 static uint8 mapper118Mirroring[8];
 static uint8 mapper118PPUSlot;
 
-/* RAMBO-1 has a different IRQ counter and therefore uses its own core. */
+/* RAMBO-1 的 IRQ 计数方式不同，因此在本文件中维护独立状态。 */
 static uint8 ramboCommand;
 static uint8 ramboReg[11];             /* R0-R9, RF at index 10 */
 static uint8 ramboMirroring;
@@ -67,7 +66,7 @@ static uint8 ramboIRQLatch;
 static uint8 ramboIRQReload;
 static int32 ramboPrescaler;
 
-/* Mapper 33/48 share one source core in FCEUX, so keep a private instance. */
+/* FCEUX 的 Mapper 33/48 共用静态核心，因此这里保留独立实例。 */
 static uint8 mapper33Is48;
 static uint8 mapper33Regs[8];
 static uint8 mapper33Mirroring;
@@ -75,12 +74,12 @@ static uint8 mapper48IRQEnabled;
 static int16 mapper48IRQCount;
 static int16 mapper48IRQLatch;
 
-/* Mapper 119 needs an independently-selectable CHR-RAM chip. */
+/* Mapper 119 需要可逐个 1 KiB 槽选择的独立 CHR-RAM 映射。 */
 static uint8* mapper742FallbackCHRRAM = NULL;
 static uint32 mapper742FallbackCHRRAMSize = 0;
 
 /* -------------------------------------------------------------------------
- * Stage 3 native-core bridge
+ * 原生 Mapper 核心桥接层
  * ---------------------------------------------------------------------- */
 
 enum Mapper742NativeCoreID
@@ -88,11 +87,13 @@ enum Mapper742NativeCoreID
     M742_NATIVE_MMC5 = 0,
     M742_NATIVE_BANDAI,
     M742_NATIVE_N163,
+    M742_NATIVE_VRC6_AUDIO,
     M742_NATIVE_VRC7_AUDIO,
     M742_NATIVE_MAPPER80,
     M742_NATIVE_FME7,
     M742_NATIVE_MAPPER112,
     M742_NATIVE_JY,
+    M742_NATIVE_MAPPER18,
     M742_NATIVE_MAGIC_DRAGON,
     M742_NATIVE_GTROM,
     M742_NATIVE_UNROM512,
@@ -132,13 +133,13 @@ static uint8* mapper742BaseCHRPtr[32];
 static uint32 mapper742BaseCHRSize[32];
 static uint8 mapper742BaseCHRRAM[32];
 
-/* Bandai FCG's FPGA compatibility ExRAM/stack. */
+/* Bandai FCG 兼容模式使用的 2 KiB ExRAM / Datach 栈。 */
 static uint8 mapper742ExRAM[0x800];
 static uint16 mapper742ExRAMStackPointer;
 static void (*mapper742BandaiWrite)(uint32 A, uint8 V) = NULL;
 static uint8(*mapper742BandaiRead)(uint32 A) = NULL;
 
-/* $4102 expansion-audio routing. */
+/* $4102 独立扩展音频路由。 */
 struct Mapper742AudioRoute
 {
     uint16 start;
@@ -157,10 +158,13 @@ struct Mapper742CapturedAudio
     uint8 captured;
 };
 
-static Mapper742CapturedAudio mapper742Audio[5];
+static Mapper742CapturedAudio mapper742Audio[6];
 static Mapper742AudioRoute mapper742InstalledAudio[3];
 static uint8 mapper742InstalledAudioCount;
 static uint8 activeAudioMode;
+
+/* $4104 bit 4 启用时，用组合 PPU Hook 在原核心处理后再次强制镜像。 */
+static void (*mapper742UnderlyingPPUHook)(uint32 address) = NULL;
 
 static void (*mapperSync)(int, int, int, int) = NULL;
 
@@ -172,7 +176,7 @@ static void Mapper742_StateRestore(int version);
 static DECLFW(Mapper742_WriteSupervisor);
 
 /* -------------------------------------------------------------------------
- * Supervisor helpers
+ * Supervisor 寄存器辅助函数
  * ---------------------------------------------------------------------- */
 
 static int Mapper742_CompatibilitySupervisorEnabled(void)
@@ -196,6 +200,50 @@ static uint8 Mapper742_EffectiveMapperMode(void)
 static uint8 Mapper742_EffectiveOptions(void)
 {
     return Mapper742_CompatibilitySupervisorEnabled() ? 0x00 : supervisor[0x03];
+}
+
+
+/*
+ * $4104 bit 4 的镜像覆盖对所有主 Mapper 生效：
+ *   bit 5 = 0：垂直镜像；
+ *   bit 5 = 1：水平镜像。
+ * 该设置是整个 Mapper 742 的最高镜像优先级。
+ */
+static int Mapper742_MirroringOverrideEnabled(void)
+{
+    return (supervisor[0x04] & 0x10) != 0;
+}
+
+static void Mapper742_ApplyGlobalMirroringOverride(void)
+{
+    if (Mapper742_MirroringOverrideEnabled())
+        setmirror((supervisor[0x04] & 0x20) ? MI_H : MI_V);
+}
+
+static void Mapper742_PPUOverrideHook(uint32 address)
+{
+    if (mapper742UnderlyingPPUHook &&
+        mapper742UnderlyingPPUHook != Mapper742_PPUOverrideHook)
+    {
+        mapper742UnderlyingPPUHook(address);
+    }
+
+    /* 原 Mapper 的 PPU Hook 运行完毕后，再施加最高优先级镜像。 */
+    Mapper742_ApplyGlobalMirroringOverride();
+}
+
+static void Mapper742_InstallMirroringOverrideHook(void)
+{
+    mapper742UnderlyingPPUHook = NULL;
+
+    if (!Mapper742_MirroringOverrideEnabled())
+        return;
+
+    if (PPU_hook != Mapper742_PPUOverrideHook)
+        mapper742UnderlyingPPUHook = PPU_hook;
+
+    PPU_hook = Mapper742_PPUOverrideHook;
+    Mapper742_ApplyGlobalMirroringOverride();
 }
 
 /* $4105 bits 4 and 5 may be exchanged by $4104 bit 0. */
@@ -447,7 +495,7 @@ static void Mapper742_RegisterNativeCore(int id, Mapper742NativeInit init)
 }
 
 /* -------------------------------------------------------------------------
- * Mapping callbacks
+ * PRG/CHR 映射同步回调
  * ---------------------------------------------------------------------- */
 
 static void Mapper742_SyncNROM(int prgAND, int prgOR, int chrAND, int chrOR)
@@ -575,8 +623,15 @@ static void Mapper742_ApplyMMC3Mirroring(uint8 value)
     uint8 options = Mapper742_EffectiveOptions();
     uint8 submode = options & 0x0F;
 
-    /* Priority: Mapper 118 > Mapper 154 > extended/native MMC3. */
-    if (features & 0x10)
+    /*
+     * 镜像优先级：
+     * $4104 bit 4 > Mapper 118 > Mapper 154 > 扩展/原生 MMC3。
+     */
+    if (Mapper742_MirroringOverrideEnabled())
+    {
+        Mapper742_ApplyGlobalMirroringOverride();
+    }
+    else if (features & 0x10)
     {
         setmirror(mapper118Mirroring[mapper118PPUSlot & 7] ? MI_1 : MI_0);
     }
@@ -1132,6 +1187,7 @@ static void Mapper742_Sync(void)
         Mapper742_ApplyNativeMappings(core);
         if (core->restore)
             core->restore(0);
+        Mapper742_ApplyGlobalMirroringOverride();
         return;
     }
 
@@ -1139,10 +1195,12 @@ static void Mapper742_Sync(void)
 
     if (mapperSync)
         mapperSync(prgAND, prgOR, chrAND, chrOR);
+
+    Mapper742_ApplyGlobalMirroringOverride();
 }
 
 /* -------------------------------------------------------------------------
- * Core selection
+ * 主 Mapper 核心选择
  * ---------------------------------------------------------------------- */
 
 static DECLFW(Mapper742_WriteNothing)
@@ -1153,6 +1211,7 @@ static DECLFW(Mapper742_WriteNothing)
 
 static void Mapper742_ResetHandlers(void)
 {
+    mapper742UnderlyingPPUHook = NULL;
     PPU_hook = NULL;
     MapIRQHook = NULL;
     GameHBIRQHook = NULL;
@@ -1165,14 +1224,31 @@ static void Mapper742_ResetHandlers(void)
     SetWriteHandler(0x6000, 0xFFFF, Mapper742_WriteNothing);
 }
 
-static void Mapper742_GetVRCPins(int* a0, int* a1)
+static int Mapper742_LowestSetBit(uint8 value)
 {
-    uint8 value = Mapper742_EffectiveOptions();
-    int first = -1;
-    int second = -1;
+    int bit;
+    for (bit = 0; bit < 8; ++bit)
+        if (value & (1 << bit))
+            return bit;
+    return -1;
+}
+
+/*
+ * 计算 VRC2/4 与 VRC6 的两根地址响应线。
+ *
+ * - 选择超过两个 bit 时，仅使用最低的两个；
+ * - 只选择一个 bit 时，第二根线使用其高一位，bit 7 后回绕到 bit 0；
+ * - 没有选择任何 bit 时，按 #$03 回退；
+ * - $4104 bit 6 会交换两根响应线的顺序。
+ */
+static void Mapper742_GetVRCResponsePins(int* a0, int* a1)
+{
+    uint8 value;
+    int first;
+    int second;
     int bit;
 
-    /* Compatibility mode 1 explicitly means VRC2b. */
+    /* Compatibility Supervisor 的模式 1 固定模拟 VRC2b。 */
     if (Mapper742_CompatibilitySupervisorEnabled() &&
         ((supervisor[0x00] & 0x03) == 1))
     {
@@ -1181,33 +1257,50 @@ static void Mapper742_GetVRCPins(int* a0, int* a1)
         return;
     }
 
-    for (bit = 0; bit < 8; ++bit)
+    value = supervisor[0x03];
+    if (!value)
+        value = 0x03;
+
+    first = Mapper742_LowestSetBit(value);
+    second = -1;
+
+    for (bit = first + 1; bit < 8; ++bit)
     {
         if (value & (1 << bit))
         {
-            if (first < 0)
-                first = bit;
-            else
-            {
-                second = bit;
-                break;
-            }
+            second = bit;
+            break;
         }
     }
 
-    if (first < 0)
-    {
-        *a0 = 0x01;
-        *a1 = 0x02;
-    }
-    else
-    {
-        if (second < 0)
-            second = first == 0 ? 1 : 0;
+    if (second < 0)
+        second = (first + 1) & 7;
 
-        *a0 = 1 << first;
-        *a1 = 1 << second;
+    *a0 = 1 << first;
+    *a1 = 1 << second;
+
+    if (supervisor[0x04] & 0x40)
+    {
+        int temporary = *a0;
+        *a0 = *a1;
+        *a1 = temporary;
     }
+}
+
+/*
+ * VRC7 仅使用最低的一根响应线。若 $4103 为 0，则 #$03 回退后仍取 bit 0。
+ * 对单根地址线而言，“交换顺序”没有可观察效果，因此 $4104 bit 6 被忽略。
+ */
+static int Mapper742_GetVRC7ResponsePin(void)
+{
+    uint8 value = supervisor[0x03];
+    int bit;
+
+    if (!value)
+        value = 0x03;
+
+    bit = Mapper742_LowestSetBit(value);
+    return 1 << bit;
 }
 
 static void Mapper742_ActivateNROM(void)
@@ -1679,6 +1772,24 @@ static void Mapper742_CaptureNativeAudio(uint8 mode, int nativeID)
     Mapper742_ApplyMode(0);
 }
 
+static void Mapper742_CaptureVRC6Audio(void)
+{
+    Mapper742CapturedAudio* audio = &mapper742Audio[5];
+
+    Mapper742_ResetHandlers();
+    Mapper742_ActivateNative(M742_NATIVE_VRC6_AUDIO, 1);
+    audio->sound = mapper742Native[M742_NATIVE_VRC6_AUDIO].initialSound;
+
+    /* VRC6：两个方波、一个锯齿波以及 $9003 全局控制。 */
+    audio->routeCount = 3;
+    Mapper742_CaptureRoute(audio, 0, 0x9000, 0x9003);
+    Mapper742_CaptureRoute(audio, 1, 0xA000, 0xA002);
+    Mapper742_CaptureRoute(audio, 2, 0xB000, 0xB002);
+    audio->captured = 1;
+
+    Mapper742_ApplyMode(0);
+}
+
 static void Mapper742_CaptureVRC7Audio(void)
 {
     Mapper742CapturedAudio* audio = &mapper742Audio[4];
@@ -1695,7 +1806,7 @@ static void Mapper742_CaptureVRC7Audio(void)
 
 static void Mapper742_EnsureAudioCaptured(uint8 mode)
 {
-    if (mode > 4 || mapper742Audio[mode].captured)
+    if (mode > 5 || mapper742Audio[mode].captured)
         return;
 
     switch (mode)
@@ -1704,6 +1815,7 @@ static void Mapper742_EnsureAudioCaptured(uint8 mode)
     case 2: Mapper742_CaptureNativeAudio(2, M742_NATIVE_N163); break;
     case 3: Mapper742_CaptureNativeAudio(3, M742_NATIVE_FME7); break;
     case 4: Mapper742_CaptureVRC7Audio(); break;
+    case 5: Mapper742_CaptureVRC6Audio(); break;
     default: break;
     }
 }
@@ -1718,7 +1830,7 @@ static void Mapper742_ApplyAudio(uint8 clear)
     Mapper742_ClearAudioRoutes();
     activeAudioMode = mode;
 
-    if (!mode || mode > 4)
+    if (!mode || mode > 5)
         return;
 
     Mapper742_EnsureAudioCaptured(mode);
@@ -1790,7 +1902,7 @@ static void Mapper742_ApplyMode(uint8 clear)
         break;
 
     case 0x09: /* VRC2/4 */
-        Mapper742_GetVRCPins(&a0, &a1);
+        Mapper742_GetVRCResponsePins(&a0, &a1);
         mapperSync = Mapper742_SyncVRC24;
 
         if ((supervisor[0x04] & 0x02) ||
@@ -1813,16 +1925,16 @@ static void Mapper742_ApplyMode(uint8 clear)
         break;
 
     case 0x0B: /* VRC6 mapper core */
-        Mapper742_GetVRCPins(&a0, &a1);
+        Mapper742_GetVRCResponsePins(&a0, &a1);
         mapperSync = Mapper742_SyncVRC6;
         VRC6_activate(clear, Mapper742_Sync, a0, a1,
             NULL, NULL, NULL, NULL);
         break;
 
-    case 0x0C: /* VRC7 mapper core */
-        Mapper742_GetVRCPins(&a0, &a1);
+    case 0x0C: /* VRC7 主 Mapper 核心 */
+        a0 = Mapper742_GetVRC7ResponsePin();
         mapperSync = Mapper742_SyncVRC7;
-        VRC7_activate(clear, Mapper742_Sync, a0 | a1);
+        VRC7_activate(clear, Mapper742_Sync, a0);
         break;
 
     case 0x05: /* MMC5 */
@@ -1856,6 +1968,10 @@ static void Mapper742_ApplyMode(uint8 clear)
 
     case 0x11: /* J.Y. Company */
         Mapper742_ActivateNative(M742_NATIVE_JY, clear);
+        break;
+
+    case 0x12: /* Jaleco SS88006 / Mapper 18 */
+        Mapper742_ActivateNative(M742_NATIVE_MAPPER18, clear);
         break;
 
     case 0x80: /* GNROM */
@@ -1905,13 +2021,14 @@ static void Mapper742_ApplyMode(uint8 clear)
     }
 
     Mapper742_Sync();
+    Mapper742_InstallMirroringOverrideHook();
     if (mapper742ActiveNative < 0)
         SetReadHandler(0x8000, 0xFFFF, CartBR);
     GameStateRestore = Mapper742_StateRestore;
 }
 
 /* -------------------------------------------------------------------------
- * Supervisor registers and lifecycle
+ * Supervisor 寄存器写入、上电、复位与存档恢复
  * ---------------------------------------------------------------------- */
 
 static DECLFW(Mapper742_WriteSupervisor)
@@ -1982,6 +2099,7 @@ static void Mapper742_ResetRegisters(void)
     mapper154Mirroring = 0;
     mapper742ActiveNative = -1;
     mapper742InstalledAudioCount = 0;
+    mapper742UnderlyingPPUHook = NULL;
     mapper742ExRAMStackPointer = 0;
     Mapper742_ResetMMC3Banks();
     Mapper742_ResetRAMBO();
@@ -1997,7 +2115,7 @@ static void Mapper742_Power(void)
      * Lazy capture would have to power a complete native mapper the first time
      * $4102 is written and could reset the currently-running mapper if both
      * selections use the same ASIC. */
-    for (audioMode = 1; audioMode <= 4; ++audioMode)
+    for (audioMode = 1; audioMode <= 5; ++audioMode)
         Mapper742_EnsureAudioCaptured((uint8)audioMode);
 
     Mapper742_ApplyMode(1);
@@ -2092,11 +2210,13 @@ void Mapper742_Init(CartInfo* info)
     Mapper742_RegisterNativeCore(M742_NATIVE_MMC5, Mapper5_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_BANDAI, Mapper16_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_N163, Mapper19_Init);
+    Mapper742_RegisterNativeCore(M742_NATIVE_VRC6_AUDIO, Mapper24_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_VRC7_AUDIO, Mapper85_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_MAPPER80, Mapper80_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_FME7, Mapper69_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_MAPPER112, Mapper112_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_JY, Mapper90_Init);
+    Mapper742_RegisterNativeCore(M742_NATIVE_MAPPER18, Mapper18_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_MAGIC_DRAGON, Mapper107_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_GTROM, Mapper111_Init);
     Mapper742_RegisterNativeCore(M742_NATIVE_UNROM512, UNROM512_Init);

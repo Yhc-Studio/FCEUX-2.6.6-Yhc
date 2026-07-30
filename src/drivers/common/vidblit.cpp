@@ -919,20 +919,23 @@ void Blit8ToHigh(uint8* src, uint8* dest, int xr, int yr, int pitch, int xscale,
 					{
 						int doo = yscale;
 
-						do
+						while (doo--)
 						{
 							for (x = xr; x; x--, src++)
 							{
+								// Include the source pixel's XDBuf emphasis before
+								// duplicating it for integer scaling.
+								const uint32 color = _ModernDeemphColorMap<1>(src, XBuf);
 								int too = xscale;
-								do
+								while (too--)
 								{
-									*(uint32*)dest = palettetranslate[*src];
+									*(uint32*)dest = color;
 									dest += 4;
-								} while (--too);
+								}
 							}
 							src -= xr;
 							dest += pinc;
-						} while (--doo);
+						}
 						src += xr;
 					}
 				}
@@ -944,26 +947,23 @@ void Blit8ToHigh(uint8* src, uint8* dest, int xr, int yr, int pitch, int xscale,
 				{
 					int doo = yscale;
 
-					do
+					while (doo--)
 					{
 						for (x = xr; x; x--, src++)
 						{
+							const uint32 color = _ModernDeemphColorMap<1>(src, XBuf);
 							int too = xscale;
-							do
+							while (too--)
 							{
-								uint32 tmp = palettetranslate[(uint32)*src];
-								*(uint8*)dest = tmp;
-								*((uint8*)dest + 1) = tmp >> 8;
-								*((uint8*)dest + 2) = tmp >> 16;
+								*(uint8*)dest = color;
+								*((uint8*)dest + 1) = color >> 8;
+								*((uint8*)dest + 2) = color >> 16;
 								dest += 3;
-
-								//*(uint32 *)dest=palettetranslate[*src];
-								//dest+=4;
-							} while (--too);
+							}
 						}
 						src -= xr;
 						dest += pinc;
-					} while (--doo);
+					}
 					src += xr;
 				}
 				break;
@@ -975,20 +975,21 @@ void Blit8ToHigh(uint8* src, uint8* dest, int xr, int yr, int pitch, int xscale,
 				{
 					int doo = yscale;
 
-					do
+					while (doo--)
 					{
 						for (x = xr; x; x--, src++)
 						{
+							const uint16 color = static_cast<uint16>(_ModernDeemphColorMap<1>(src, XBuf));
 							int too = xscale;
-							do
+							while (too--)
 							{
-								//*(uint16 *)dest=palettetranslate[*src]; 16bpp is doomed right now
+								*(uint16*)dest = color;
 								dest += 2;
-							} while (--too);
+							}
 						}
 						src -= xr;
 						dest += pinc;
-					} while (--doo);
+					}
 					src += xr;
 				}
 				break;
