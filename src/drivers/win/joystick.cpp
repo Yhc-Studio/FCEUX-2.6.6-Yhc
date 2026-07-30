@@ -34,7 +34,9 @@ static int HavePolled[MAX_JOYSTICKS];
 
 static int background = 0;
 static DIJOYSTATE2 StatusSave[MAX_JOYSTICKS];
-static DIJOYSTATE2 StatusSaveImmediate[MAX_JOYSTICKS];
+static DIJOYSTATE2 StatusPrevious[MAX_JOYSTICKS];
+static int StatusValid[MAX_JOYSTICKS];
+static int PreviousValid[MAX_JOYSTICKS];
 
 static int FindByGUID(GUID how)
 {
@@ -116,103 +118,139 @@ static int JoyAutoRestore(HRESULT dival,LPDIRECTINPUTDEVICE7 lpJJoy)
   return(0);
 }
 
-/* Called during normal emulator operation, not during button configuration. */
-/* Call before DTestButtonJoy */
-void UpdateJoysticks(void)
+/* Poll one joystick at most once during the current input update. */
+static int PollJoystickState(int n)
 {
- memset(HavePolled, 0, sizeof(HavePolled));  
+ HRESULT dival;
+
+ if(n < 0 || n >= numjoysticks)
+  return(0);
+
+ if(HavePolled[n])
+  return(StatusValid[n]);
+
+ while((dival = IDirectInputDevice7_Poll(Joysticks[n])) != DI_OK)
+ {
+  if(dival == DI_NOEFFECT)
+   break;
+
+  if(!JoyAutoRestore(dival, Joysticks[n]))
+  {
+   /* Treat an unavailable device as released so a hotkey cannot stick. */
+   memset(&StatusSave[n], 0, sizeof(DIJOYSTATE2));
+   StatusValid[n] = 1;
+   HavePolled[n] = 1;
+   return(1);
+  }
+ }
+
+ dival = IDirectInputDevice7_GetDeviceState(Joysticks[n], sizeof(DIJOYSTATE2), &StatusSave[n]);
+ if(dival != DI_OK)
+  memset(&StatusSave[n], 0, sizeof(DIJOYSTATE2));
+
+ StatusValid[n] = 1;
+ HavePolled[n] = 1;
+ return(1);
 }
 
-int DTestButtonJoy(ButtConfig *bc)
+static int TestJoystickBinding(const DIJOYSTATE2 *state, int n, int buttonnum)
 {
- uint32 x; //mbg merge 7/17/06 changed to uint
-
- for(x=0;x<bc->NumC;x++)
+ if(buttonnum & 0x8000)       /* Axis "button" */
  {
-  HRESULT dival;
-  int n = bc->DeviceNum[x];
+  int axis = buttonnum & 7;
+  long raw = 0;
+  long min = 0;
+  long max = 0;
 
-  if(n == 0xFF)
+  switch(axis)
+  {
+   case 0: raw = state->lX;  min = ranges[n].MinX;  max = ranges[n].MaxX;  break;
+   case 1: raw = state->lY;  min = ranges[n].MinY;  max = ranges[n].MaxY;  break;
+   case 2: raw = state->lZ;  min = ranges[n].MinZ;  max = ranges[n].MaxZ;  break;
+   case 3: raw = state->lRx; min = ranges[n].MinRx; max = ranges[n].MaxRx; break;
+   case 4: raw = state->lRy; min = ranges[n].MinRy; max = ranges[n].MaxRy; break;
+   case 5: raw = state->lRz; min = ranges[n].MinRz; max = ranges[n].MaxRz; break;
+   default: return(0);
+  }
+
+  if(max == min)
+   return(0);
+
+  /* Normalize to roughly -131072..131071, matching the existing input path. */
+  long source = (long)(((int64)raw - min) * 262144 / (max - min) - 131072);
+
+  if(buttonnum & 0x4000)
+   return(source <= (0 - 262144 / 4));
+  else
+   return(source >= (262144 / 4));
+ }
+ else if(buttonnum & 0x2000) /* Hat "button" */
+ {
+  int hat = (buttonnum >> 4) & 3;
+  int target = buttonnum & 3;
+  int pov = state->rgdwPOV[hat];
+
+  return(POVFix(pov, 0) == target || POVFix(pov, 1) == target);
+ }
+ else                           /* Normal button */
+ {
+  int button = buttonnum & 127;
+  return((state->rgbButtons[button] & 0x80) != 0);
+ }
+}
+
+/* Called once at the beginning of each raw-input/hotkey update. */
+void UpdateJoysticks(void)
+{
+ int n;
+
+ /* The state polled during the preceding update becomes the comparison state
+    used by just-down hotkeys during this update. */
+ for(n = 0; n < numjoysticks; n++)
+ {
+  if(HavePolled[n] && StatusValid[n])
+  {
+   memcpy(&StatusPrevious[n], &StatusSave[n], sizeof(DIJOYSTATE2));
+   PreviousValid[n] = 1;
+  }
+ }
+
+ memset(HavePolled, 0, sizeof(HavePolled));
+}
+
+int DTestButtonJoy(ButtConfig *bc, uint8_t just_down)
+{
+ uint32 x;
+
+ for(x = 0; x < bc->NumC; x++)
+ {
+  int n;
+  int current;
+
+  if(bc->ButtType[x] != BUTTC_JOYSTICK)
    continue;
 
-  if(bc->ButtType[x] != BUTTC_JOYSTICK) continue;
-  if(n >= numjoysticks) continue;
+  n = bc->DeviceNum[x];
+  if(n == 0xFF || n >= numjoysticks)
+   continue;
 
-  if(!HavePolled[n])
-  {
-   while((dival = IDirectInputDevice7_Poll(Joysticks[n])) != DI_OK)
-   {
-    if(dival == DI_NOEFFECT) break;
+  if(!PollJoystickState(n))
+   continue;
 
-    if(!JoyAutoRestore(dival,Joysticks[n]))
-    {
-     return(0);
-    }
-   }
+  current = TestJoystickBinding(&StatusSave[n], n, bc->ButtonNum[x]);
+  if(!current)
+   continue;
 
-   IDirectInputDevice7_GetDeviceState(Joysticks[n],sizeof(DIJOYSTATE2),&StatusSave[n]);
-   HavePolled[n] = 1;
-  }
-  
-  if(bc->ButtonNum[x]&0x8000)	/* Axis "button" */
-  {
-   int sa = bc->ButtonNum[x]&7;
-   long source;
+  if(!just_down)
+   return(1);
 
-   switch (sa)
-   {
-   case 0:
-	   source = ((int64)StatusSave[n].lX - ranges[n].MinX) * 262144 /
-		   (ranges[n].MaxX - ranges[n].MinX) - 131072;
-	   break;
-   case 1:
-	   source = ((int64)StatusSave[n].lY - ranges[n].MinY) * 262144 /
-		   (ranges[n].MaxY - ranges[n].MinY) - 131072;
-	   break;
-   case 2:
-	   source = ((int64)StatusSave[n].lZ - ranges[n].MinZ) * 262144 /
-		   (ranges[n].MaxZ - ranges[n].MinZ) - 131072;
-	   break;
-   case 3:
-	   source = ((int64)StatusSave[n].lRx - ranges[n].MinRx) * 262144 /
-		   (ranges[n].MaxRx - ranges[n].MinRx) - 131072;
-	   break;
-   case 4:
-	   source = ((int64)StatusSave[n].lRy - ranges[n].MinRy) * 262144 /
-		   (ranges[n].MaxRy - ranges[n].MinRy) - 131072;
-	   break;
-   case 5:
-	   source = ((int64)StatusSave[n].lRz - ranges[n].MinRz) * 262144 /
-		   (ranges[n].MaxRz - ranges[n].MinRz) - 131072;
-	   break;
-   }
+  /* Suppress a false edge on the first poll after startup, reconnect, or
+     leaving the mapping dialog.  A release followed by a new press will fire. */
+  if(!PreviousValid[n])
+   continue;
 
-   /* Now, source is of the range -131072 to 131071.  Good enough. */
-   if(bc->ButtonNum[x] & 0x4000)
-   {
-    if(source <= (0 - 262144/4))
-     return(1);
-   }
-   else
-   {
-    if(source >= (262144/4))
-     return(1);
-   }
-  }
-  else if(bc->ButtonNum[x]&0x2000)      /* Hat "button" */
-  {
-   int wpov = StatusSave[n].rgdwPOV[(bc->ButtonNum[x] >> 4) &3];
-   int tpov = bc->ButtonNum[x] & 3;
-
-   if(POVFix(wpov, 0) == tpov || POVFix(wpov, 1) == tpov)
-    return(1);
-  }
-  else                                  /* Normal button */
-  {
-   if(StatusSave[n].rgbButtons[bc->ButtonNum[x] & 127]&0x80)
-    return(1);
-  }
-
+  if(!TestJoystickBinding(&StatusPrevious[n], n, bc->ButtonNum[x]))
+   return(1);
  }
 
  return(0);
@@ -358,6 +396,11 @@ void EndJoyWait(HWND hwnd)
   IDirectInputDevice7_Unacquire(Joysticks[n]);
   IDirectInputDevice7_SetCooperativeLevel(Joysticks[n],hwnd,DISCL_FOREGROUND|DISCL_NONEXCLUSIVE);
  }
+
+ /* Do not let the button used to assign a hotkey immediately activate it. */
+ memset(HavePolled, 0, sizeof(HavePolled));
+ memset(StatusValid, 0, sizeof(StatusValid));
+ memset(PreviousValid, 0, sizeof(PreviousValid));
 }
 
 int KillJoysticks (void)
@@ -372,6 +415,11 @@ int KillJoysticks (void)
  } 
 
  numjoysticks = 0;
+ memset(HavePolled, 0, sizeof(HavePolled));
+ memset(StatusValid, 0, sizeof(StatusValid));
+ memset(PreviousValid, 0, sizeof(PreviousValid));
+ memset(StatusSave, 0, sizeof(StatusSave));
+ memset(StatusPrevious, 0, sizeof(StatusPrevious));
 
  return(1);
 }

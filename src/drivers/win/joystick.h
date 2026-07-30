@@ -16,7 +16,7 @@ void EndJoyWait(HWND hwnd);
 void JoyClearBC(ButtConfig *bc);
 
 void UpdateJoysticks(void);
-int DTestButtonJoy(ButtConfig *bc);
+int DTestButtonJoy(ButtConfig *bc, uint8_t just_down = 0);
 
 #define JOYBACKACCESS_OLDSTYLE 1
 #define JOYBACKACCESS_TASEDITOR 2

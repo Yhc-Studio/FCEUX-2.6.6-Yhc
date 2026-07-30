@@ -279,7 +279,7 @@ int DTestButton(ButtConfig *bc, uint8_t just_down, uint8_t block_meta)
 			}
 		}
 	}
-	if (DTestButtonJoy(bc)) return 1;
+	if (DTestButtonJoy(bc, just_down)) return 1;
 	return 0;
 }
 
@@ -507,8 +507,10 @@ void HandleHotkeys()
 
 void UpdateRawInputAndHotkeys()
 {
-	KeyboardUpdateState();
+	// Start a new joystick frame before any DTestButton() calls.
+	// KeyboardUpdateState() also checks the auto-hold mappings, which may use a joystick.
 	UpdateJoysticks();
+	KeyboardUpdateState();
 
 	HandleHotkeys();
 }
