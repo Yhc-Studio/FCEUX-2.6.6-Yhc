@@ -500,8 +500,28 @@ static uint8 suborkbkeys[0x65];
 
 void KeyboardUpdateState(void); //mbg merge 7/17/06 yech had to add this
 
+/* Hotkeys follow the Background Input option.  A final input update can
+   occur while a click is transferring focus to another application, so
+   check the foreground process instead of relying only on DirectInput. */
+static bool HotkeyInputAllowed()
+{
+	if (EnableBackgroundInput)
+		return true;
+
+	HWND foreground = GetForegroundWindow();
+	if (!foreground)
+		return false;
+
+	DWORD foregroundProcess = 0;
+	GetWindowThreadProcessId(foreground, &foregroundProcess);
+	return foregroundProcess == GetCurrentProcessId();
+}
+
 void HandleHotkeys()
 {
+	if (!HotkeyInputAllowed())
+		return;
+
 	FCEUI_HandleEmuCommands(FCEUD_TestCommandState);
 }
 

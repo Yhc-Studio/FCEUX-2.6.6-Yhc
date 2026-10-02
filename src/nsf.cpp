@@ -58,8 +58,15 @@ static const int FIXED_EXWRAM_SIZE = 32768 + 8192;
 static uint8 SongReload;
 static int32 CurrentSong;
 static uint32 NSFPlayFrames;
-static uint32 NSFPlayRateRemainderUS;
+static uint32 NSFPlayRateRemainderUS; /* legacy savestate field; kept for compatibility */
+static uint64 NSFPlayCyclePhase;
+static uint64 NSFPlayCyclePeriod;
+static uint32 NSFPlayCycleScale;
+static uint8 NSFPlaySchedulerArmed;
+static uint8 NSFPlaySchedulerSyncOnFirstPlay;
 static uint8 NSFPlayCallCount;
+static uint8 NSFCPUHookInstalled;
+static void (*NSFOldMapIRQHook)(int a);
 static uint8 NSFPaused;
 static uint8 NSFStopped;
 static uint8 NSFOutputMuteActive;
@@ -80,9 +87,11 @@ static void NSFRemoveAPUWriteHook(void);
 static void NSFResetAPUShadow(void);
 static void NSFResetPlayTimer(void);
 static void NSFResetPlayScheduler(void);
-static uint8 NSFComputePlayCallsForFrame(void);
 static uint32 NSFGetPlaybackSpeedUS(void);
-static uint32 NSFGetFrameDurationUS(void);
+static void NSFRefreshPlayCycleRate(void);
+static void NSFCPUCycleHook(int cycles);
+static void NSFInstallCPUPlayHook(void);
+static void NSFRemoveCPUPlayHook(void);
 static double NSFGetPlaybackRateHz(void);
 static void NSFResetPlaybackControl(void);
 static void NSFSetOutputMute(int mute);
@@ -259,7 +268,15 @@ static void NSFResetPlayTimer(void)
 
 static void NSFResetPlayScheduler(void)
 {
+	/* Keep the old 32-bit field at zero so older savestates/configurations that
+	 * know about NPRM remain harmless.  Actual scheduling is now done against
+	 * CPU time, not whole video frames.
+	 */
 	NSFPlayRateRemainderUS = 0;
+	NSFPlayCyclePhase = 0;
+	NSFRefreshPlayCycleRate();
+	NSFPlaySchedulerArmed = 0;
+	NSFPlaySchedulerSyncOnFirstPlay = 0;
 	NSFPlayCallCount = 0;
 }
 
@@ -273,11 +290,6 @@ static int NSFIsPALPlayback(void)
 	return (NSFHeader.VideoSystem & 1) ? 1 : 0;
 }
 
-static uint32 NSFGetFrameDurationUS(void)
-{
-	return NSFIsPALPlayback() ? 20000U : 16666U;
-}
-
 static uint32 NSFGetPlaybackSpeedUS(void)
 {
 	uint32 speed;
@@ -287,13 +299,38 @@ static uint32 NSFGetPlaybackSpeedUS(void)
 	else
 		speed = NSFReadLE16Bytes(NSFHeader.NTSCspeed);
 
-	/* NSF speed fields are microseconds between play calls.
-	 * A zero value means the default rate for the selected video system.
+	/* NSF speed fields are microseconds between PLAY calls.  Use the canonical
+	 * defaults rather than rounding them to 20,000 / 16,666 us.  0x40FF is
+	 * 16,639 us and is the normal NTSC rate.
 	 */
 	if (!speed)
-		speed = NSFIsPALPlayback() ? 20000U : 16666U;
+		speed = NSFIsPALPlayback() ? 19997U : 16639U;
+
+	/* The previous frame scheduler limited malformed/high-rate files to 16 PLAY
+	 * calls per video frame.  Keep an equivalent safety floor while still
+	 * allowing normal 120/180/240 Hz NSFs.
+	 */
+	{
+		uint32 minSpeed = NSFIsPALPlayback() ? (19997U / 16U) : (16639U / 16U);
+		if (speed < minSpeed)
+			speed = minSpeed;
+	}
 
 	return speed;
+}
+
+static void NSFRefreshPlayCycleRate(void)
+{
+	if (NSFIsPALPlayback())
+	{
+		NSFPlayCyclePeriod = (uint64)NSFGetPlaybackSpeedUS() * 13300857ULL;
+		NSFPlayCycleScale = 8000000U;
+	}
+	else
+	{
+		NSFPlayCyclePeriod = (uint64)NSFGetPlaybackSpeedUS() * 315ULL;
+		NSFPlayCycleScale = 176U;
+	}
 }
 
 static double NSFGetPlaybackRateHz(void)
@@ -304,25 +341,67 @@ static double NSFGetPlaybackRateHz(void)
 	return 1000000.0 / (double)speed;
 }
 
-static uint8 NSFComputePlayCallsForFrame(void)
+/*
+ * PLAY scheduling used to be quantized to the video-frame boundary.  For an
+ * NTSC speed such as 0x40FF (16639 us), adding a rounded 16666 us per frame
+ * eventually produced two PLAY calls in one frame.  A slightly slower speed
+ * such as 0x4165 (16741 us) eventually produced a frame with no PLAY call.
+ * Because the old trampoline executed those calls back-to-back at vblank, the
+ * result was an audible one-frame skip/hold.
+ *
+ * Schedule against actual 6502 cycles instead.  MapIRQHook is called once per
+ * executed instruction with the exact CPU-cycle count.  The ratios below are
+ * the same clocks used by FCEUX, expressed as exact/compact rational values:
+ *   NTSC: 1.789772727... cycles/us = 315 / 176
+ *   PAL : 1.662607125    cycles/us = 13300857 / 8000000
+ *
+ * NSFPlayCyclePhase stores elapsed_cycles * denominator.  A PLAY event is due
+ * when it reaches speed_us * numerator.  This keeps PLAY calls evenly spaced
+ * even when two of them fall inside one video frame or a video frame contains
+ * none.
+ */
+static void NSFCPUCycleHook(int cycles)
 {
-	uint32 speed = NSFGetPlaybackSpeedUS();
-	uint32 calls;
+	if (NSFOldMapIRQHook)
+		NSFOldMapIRQHook(cycles);
 
-	if (!speed)
-		speed = NSFGetFrameDurationUS();
+	if (!NSFPlaySchedulerArmed || NSFPaused || NSFStopped || cycles <= 0 || !NSFPlayCyclePeriod)
+		return;
 
-	NSFPlayRateRemainderUS += NSFGetFrameDurationUS();
-	calls = NSFPlayRateRemainderUS / speed;
-	NSFPlayRateRemainderUS %= speed;
+	NSFPlayCyclePhase += (uint64)cycles * NSFPlayCycleScale;
 
-	/* Avoid locking the emulator on malformed NSF headers with tiny speed values.
-	 * Real high-rate NSFs such as 120Hz/180Hz/240Hz stay well below this.
+	/* $3FF4 clears bit 1 while the NSF INIT/PLAY routine is running and $3FF5
+	 * sets it again when the trampoline is idle.  Do not queue a nested NMI if
+	 * a slow PLAY routine happens to run across the next deadline.
 	 */
-	if (calls > 16)
-		calls = 16;
+	if ((NSFNMIFlags & 2) && NSFPlayCyclePhase >= NSFPlayCyclePeriod)
+	{
+		NSFPlayCyclePhase %= NSFPlayCyclePeriod;
+		NSFPlayCallCount = 1;
+		TriggerNMI();
+	}
+}
 
-	return (uint8)calls;
+static void NSFInstallCPUPlayHook(void)
+{
+	if (NSFCPUHookInstalled)
+		return;
+
+	NSFOldMapIRQHook = MapIRQHook;
+	MapIRQHook = NSFCPUCycleHook;
+	NSFCPUHookInstalled = 1;
+}
+
+static void NSFRemoveCPUPlayHook(void)
+{
+	if (!NSFCPUHookInstalled)
+		return;
+
+	if (MapIRQHook == NSFCPUCycleHook)
+		MapIRQHook = NSFOldMapIRQHook;
+
+	NSFOldMapIRQHook = 0;
+	NSFCPUHookInstalled = 0;
 }
 
 static void NSFResetPlaybackControl(void)
@@ -905,6 +984,7 @@ void NSFGI(GI h)
 	switch (h)
 	{
 	case GI_CLOSE:
+		NSFRemoveCPUPlayHook();
 		NSFRemoveExpReadHook();
 		NSFRemoveExpWriteHook();
 		NSFRemoveAPUWriteHook();
@@ -1514,6 +1594,9 @@ static SFORMAT StateRegs[] = {
 	{&doreset, 1, "DORE"},
 	{&NSFNMIFlags, 1, "NMIF"},
 	{&NSFPlayRateRemainderUS, 4 | FCEUSTATE_RLSB, "NPRM"},
+	{&NSFPlayCyclePhase, 8 | FCEUSTATE_RLSB, "NPCP"},
+	{&NSFPlaySchedulerArmed, 1, "NPSA"},
+	{&NSFPlaySchedulerSyncOnFirstPlay, 1, "NPSS"},
 	{&NSFPlayCallCount, 1, "NPCN"},
 	{ 0 }
 };
@@ -1521,6 +1604,7 @@ static SFORMAT StateRegs[] = {
 void NSF_init(void)
 {
 	doreset = 1;
+	NSFRemoveCPUPlayHook();
 	NSFRemoveExpReadHook();
 	NSFRemoveExpWriteHook();
 	NSFRemoveAPUWriteHook();
@@ -1652,6 +1736,7 @@ void NSF_init(void)
 	NSFInstallAPUWriteHook();
 	NSFInstallExpWriteHook();
 	NSFInstallExpReadHook();
+	NSFInstallCPUPlayHook();
 
 	//zero 17-apr-2013 - added
 	AddExState(StateRegs, ~0, 0, 0);
@@ -1749,6 +1834,15 @@ static DECLFR(NSF_read)
 			return (CurrentSong - 1);
 		}
 	case 0x3ff2:
+		/* On a song reload the INIT routine runs before the first PLAY.  Rebase the
+		 * cycle scheduler here, immediately before the trampoline enters PLAY, so
+		 * a long INIT routine cannot shorten the first musical interval.
+		 */
+		if (NSFPlaySchedulerSyncOnFirstPlay)
+		{
+			NSFPlayCyclePhase = 0;
+			NSFPlaySchedulerSyncOnFirstPlay = 0;
+		}
 		return NSFPlayCallCount;
 	case 0x3FF3:return PAL;
 	}
@@ -3361,19 +3455,22 @@ void DoNSFFrame(void)
 {
 	if (!NSFPaused && !NSFStopped)
 	{
-		uint8 calls = NSFComputePlayCallsForFrame();
-
-		/* On song reload we must enter the NSF trampoline so the init routine is
-		 * called even if the rate accumulator would otherwise produce 0 play calls
-		 * for this video frame.
+		/* Frame boundaries are now used only to start/reload a song and to update
+		 * the visualizer timer.  Normal PLAY calls are generated by
+		 * NSFCPUCycleHook() at their real sub-frame deadlines.
 		 */
-		if (SongReload && calls == 0)
-			calls = 1;
-
-		NSFPlayCallCount = calls;
-
-		if (((NSFNMIFlags & 1) && SongReload) || ((NSFNMIFlags & 2) && calls > 0))
+		if ((NSFNMIFlags & 1) && SongReload)
+		{
+			/* Preserve the legacy behavior: INIT is immediately followed by the first
+			 * PLAY call in the same trampoline entry.  The next PLAY is then exactly
+			 * NSFGetPlaybackSpeedUS() later in CPU time.
+			 */
+			NSFResetPlayScheduler();
+			NSFPlayCallCount = 1;
+			NSFPlaySchedulerArmed = 1;
+			NSFPlaySchedulerSyncOnFirstPlay = 1;
 			TriggerNMI();
+		}
 
 		// Count playback time after the NSF play routine has started.
 		// This is UI-only timing, reset whenever the track is changed/reloaded.

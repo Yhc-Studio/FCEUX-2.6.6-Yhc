@@ -38,6 +38,8 @@ static DIJOYSTATE2 StatusPrevious[MAX_JOYSTICKS];
 static int StatusValid[MAX_JOYSTICKS];
 static int PreviousValid[MAX_JOYSTICKS];
 
+extern int EnableBackgroundInput;
+
 static int FindByGUID(GUID how)
 {
  int x;
@@ -118,10 +120,77 @@ static int JoyAutoRestore(HRESULT dival,LPDIRECTINPUTDEVICE7 lpJJoy)
   return(0);
 }
 
+/* Background Input explicitly permits input from another application.
+   Otherwise only windows owned by this FCEUX process count as foreground.
+   This also covers FCEUX-owned debugger and configuration windows. */
+static int JoystickInputAllowed(void)
+{
+ HWND foreground;
+ DWORD foregroundProcess = 0;
+
+ if(EnableBackgroundInput)
+  return(1);
+
+ foreground = GetForegroundWindow();
+ if(!foreground)
+  return(0);
+
+ GetWindowThreadProcessId(foreground, &foregroundProcess);
+ return(foregroundProcess == GetCurrentProcessId());
+}
+
+static void InvalidateRuntimeJoystickState(void)
+{
+ memset(HavePolled, 0, sizeof(HavePolled));
+ memset(StatusValid, 0, sizeof(StatusValid));
+ memset(PreviousValid, 0, sizeof(PreviousValid));
+}
+
+/* Read one joystick state without exposing uninitialized or synthetic axis data. */
+static int ReadJoystickState(int n, DIJOYSTATE2 *state)
+{
+ HRESULT dival;
+ int attempt;
+
+ if(!state || n < 0 || n >= numjoysticks || !Joysticks[n])
+  return(0);
+
+ memset(state, 0, sizeof(DIJOYSTATE2));
+
+ /* Acquiring a foreground DirectInput device can briefly fail when a dialog
+    receives a mouse click or the application changes focus.  Retry once after
+    reacquiring, but never treat a failed read as a valid all-zero joystick
+    state: zero is an extreme negative value for many DirectInput axes. */
+ for(attempt = 0; attempt < 2; attempt++)
+ {
+  dival = IDirectInputDevice7_Poll(Joysticks[n]);
+  if(dival != DI_OK && dival != DI_NOEFFECT)
+  {
+   if(!JoyAutoRestore(dival, Joysticks[n]))
+    return(0);
+   continue;
+  }
+
+  dival = IDirectInputDevice7_GetDeviceState(Joysticks[n], sizeof(DIJOYSTATE2), state);
+  if(dival == DI_OK)
+   return(1);
+
+  if(!JoyAutoRestore(dival, Joysticks[n]))
+   return(0);
+ }
+
+ memset(state, 0, sizeof(DIJOYSTATE2));
+ return(0);
+}
+
 /* Poll one joystick at most once during the current input update. */
 static int PollJoystickState(int n)
 {
- HRESULT dival;
+ if(!JoystickInputAllowed())
+ {
+  InvalidateRuntimeJoystickState();
+  return(0);
+ }
 
  if(n < 0 || n >= numjoysticks)
   return(0);
@@ -129,27 +198,19 @@ static int PollJoystickState(int n)
  if(HavePolled[n])
   return(StatusValid[n]);
 
- while((dival = IDirectInputDevice7_Poll(Joysticks[n])) != DI_OK)
- {
-  if(dival == DI_NOEFFECT)
-   break;
+ HavePolled[n] = 1;
 
-  if(!JoyAutoRestore(dival, Joysticks[n]))
-  {
-   /* Treat an unavailable device as released so a hotkey cannot stick. */
-   memset(&StatusSave[n], 0, sizeof(DIJOYSTATE2));
-   StatusValid[n] = 1;
-   HavePolled[n] = 1;
-   return(1);
-  }
+ if(!ReadJoystickState(n, &StatusSave[n]) || !JoystickInputAllowed())
+ {
+  /* A failed read means no input for this update.  Mark the previous sample
+     invalid as well so reconnecting while a button is held cannot create a
+     false just-down edge. */
+  StatusValid[n] = 0;
+  PreviousValid[n] = 0;
+  return(0);
  }
 
- dival = IDirectInputDevice7_GetDeviceState(Joysticks[n], sizeof(DIJOYSTATE2), &StatusSave[n]);
- if(dival != DI_OK)
-  memset(&StatusSave[n], 0, sizeof(DIJOYSTATE2));
-
  StatusValid[n] = 1;
- HavePolled[n] = 1;
  return(1);
 }
 
@@ -204,6 +265,12 @@ void UpdateJoysticks(void)
 {
  int n;
 
+ if(!JoystickInputAllowed())
+ {
+  InvalidateRuntimeJoystickState();
+  return;
+ }
+
  /* The state polled during the preceding update becomes the comparison state
     used by just-down hotkeys during this update. */
  for(n = 0; n < numjoysticks; n++)
@@ -221,6 +288,12 @@ void UpdateJoysticks(void)
 int DTestButtonJoy(ButtConfig *bc, uint8_t just_down)
 {
  uint32 x;
+
+ if(!JoystickInputAllowed())
+ {
+  InvalidateRuntimeJoystickState();
+  return(0);
+ }
 
  for(x = 0; x < bc->NumC; x++)
  {
@@ -257,6 +330,7 @@ int DTestButtonJoy(ButtConfig *bc, uint8_t just_down)
 }
 
 static int canax[MAX_JOYSTICKS][6];
+static int WaitStatusValid[MAX_JOYSTICKS];
 
 /* Now the fun configuration test begins. */
 void BeginJoyWait(HWND hwnd)
@@ -265,14 +339,18 @@ void BeginJoyWait(HWND hwnd)
 
  //StatusSave = malloc(sizeof(DIJOYSTATE2) * numjoysticks);
  memset(canax, 0, sizeof(canax));
+ memset(WaitStatusValid, 0, sizeof(WaitStatusValid));
 
  for(n=0; n<numjoysticks; n++)
  {
   IDirectInputDevice7_Unacquire(Joysticks[n]);
   IDirectInputDevice7_SetCooperativeLevel(Joysticks[n],hwnd,DISCL_FOREGROUND|DISCL_NONEXCLUSIVE);
   IDirectInputDevice7_Acquire(Joysticks[n]);
-  IDirectInputDevice7_Poll(Joysticks[n]);
-  IDirectInputDevice7_GetDeviceState(Joysticks[n],sizeof(DIJOYSTATE2),&StatusSave[n]);
+
+  if(ReadJoystickState(n, &StatusSave[n]))
+   WaitStatusValid[n] = 1;
+  else
+   memset(&StatusSave[n], 0, sizeof(DIJOYSTATE2));
  }
 }
 
@@ -283,16 +361,27 @@ int DoJoyWaitTest(GUID *guid, uint8 *devicenum, uint16 *buttonnum)
 
  for(n=0; n<numjoysticks; n++)
  {
-  HRESULT dival;
   DIJOYSTATE2 JoyStatus;
   int ba;
 
-  while((dival = IDirectInputDevice7_Poll(Joysticks[n])) != DI_OK)
+  /* Mouse clicks and focus changes can temporarily make DirectInput report
+     INPUTLOST/NOTACQUIRED.  Ignore that timer tick instead of examining an
+     uninitialized JoyStatus structure and inventing an axis X+/X- binding. */
+  if(!ReadJoystickState(n, &JoyStatus))
   {
-   if(dival == DI_NOEFFECT) break;
-   if(!JoyAutoRestore(dival,Joysticks[n])) return(0);
+   WaitStatusValid[n] = 0;
+   memset(canax[n], 0, sizeof(canax[n]));
+   continue;
   }
-  dival = IDirectInputDevice7_GetDeviceState(Joysticks[n],sizeof(DIJOYSTATE2),&JoyStatus);
+
+  /* The first valid sample after opening the dialog or reacquiring the device
+     is only a baseline.  It must never be interpreted as a newly pressed key. */
+  if(!WaitStatusValid[n])
+  {
+   memcpy(&StatusSave[n], &JoyStatus, sizeof(DIJOYSTATE2));
+   WaitStatusValid[n] = 1;
+   continue;
+  }
 
   for(ba = 0; ba < 128; ba++)
    if((JoyStatus.rgbButtons[ba]&0x80) && !(StatusSave[n].rgbButtons[ba]&0x80))
@@ -300,78 +389,69 @@ int DoJoyWaitTest(GUID *guid, uint8 *devicenum, uint16 *buttonnum)
     *devicenum = n;
     *buttonnum = ba;
     *guid = JoyGUID[n];
-    //memcpy(&StatusSave[n], &JoyStatus, sizeof(DIJOYSTATE2));
-    memcpy(StatusSave[n].rgbButtons, JoyStatus.rgbButtons, 128);
+    memcpy(&StatusSave[n], &JoyStatus, sizeof(DIJOYSTATE2));
     return(1);
    }
 
-  memcpy(StatusSave[n].rgbButtons, JoyStatus.rgbButtons, 128);
-
-  long source,psource;
-
   for (int axis = 0; axis < 6; axis++)
   {
-	  long da, jsl, ssl, min;
-	  switch (axis)
-	  {
-	  case 0:
-		  da = ranges[n].MaxX - ranges[n].MinX;
-		  jsl = JoyStatus.lX;
-		  ssl = StatusSave[n].lX;
-		  min = ranges[n].MinX;
-		  break;
-	  case 1:
-		  da = ranges[n].MaxY - ranges[n].MinY;
-		  jsl = JoyStatus.lY;
-		  ssl = StatusSave[n].lY;
-		  min = ranges[n].MinY;
-		  break;
-	  case 2:
-		  da = ranges[n].MaxZ - ranges[n].MinZ;
-		  jsl = JoyStatus.lZ;
-		  ssl = StatusSave[n].lZ;
-		  min = ranges[n].MinZ;
-		  break;
-	  case 3:
-		  da = ranges[n].MaxRx - ranges[n].MinRx;
-		  jsl = JoyStatus.lRx;
-		  ssl = StatusSave[n].lRx;
-		  min = ranges[n].MinRx;
-		  break;
-	  case 4:
-		  da = ranges[n].MaxRy - ranges[n].MinRy;
-		  jsl = JoyStatus.lRy;
-		  ssl = StatusSave[n].lRy;
-		  min = ranges[n].MinRy;
-		  break;
-	  case 5:
-		  da = ranges[n].MaxRz - ranges[n].MinRz;
-		  jsl = JoyStatus.lRz;
-		  ssl = StatusSave[n].lRz;
-		  min = ranges[n].MinRz;
-		  break;
-	  }
+   long da, jsl, min;
+   long source;
 
-	  if (da)
-	  {
-		  source = ((int64)jsl - min) * 262144 / da - 131072;
-		  psource = ((int64)ssl - min) * 262144 / da - 131072;
+   switch (axis)
+   {
+   case 0:
+    da = ranges[n].MaxX - ranges[n].MinX;
+    jsl = JoyStatus.lX;
+    min = ranges[n].MinX;
+    break;
+   case 1:
+    da = ranges[n].MaxY - ranges[n].MinY;
+    jsl = JoyStatus.lY;
+    min = ranges[n].MinY;
+    break;
+   case 2:
+    da = ranges[n].MaxZ - ranges[n].MinZ;
+    jsl = JoyStatus.lZ;
+    min = ranges[n].MinZ;
+    break;
+   case 3:
+    da = ranges[n].MaxRx - ranges[n].MinRx;
+    jsl = JoyStatus.lRx;
+    min = ranges[n].MinRx;
+    break;
+   case 4:
+    da = ranges[n].MaxRy - ranges[n].MinRy;
+    jsl = JoyStatus.lRy;
+    min = ranges[n].MinRy;
+    break;
+   default:
+    da = ranges[n].MaxRz - ranges[n].MinRz;
+    jsl = JoyStatus.lRz;
+    min = ranges[n].MinRz;
+    break;
+   }
 
-		  if (abs(source) >= 65536 && canax[n][axis])
-		  {
-			  *guid = JoyGUID[n];
-			  *devicenum = n;
-			  *buttonnum = 0x8000 | axis | ((source < 0) ? 0x4000 : 0);
-			  memcpy(&StatusSave[n], &JoyStatus, sizeof(DIJOYSTATE2));
-			  canax[n][axis] = 0;
-			  return(1);
-		  }
-		  else if (abs(source) <= 32768) canax[n][axis] = 1;
-	  }
+   if (da)
+   {
+    source = (long)(((int64)jsl - min) * 262144 / da - 131072);
+
+    if (abs(source) >= 65536 && canax[n][axis])
+    {
+     *guid = JoyGUID[n];
+     *devicenum = n;
+     *buttonnum = 0x8000 | axis | ((source < 0) ? 0x4000 : 0);
+     memcpy(&StatusSave[n], &JoyStatus, sizeof(DIJOYSTATE2));
+     canax[n][axis] = 0;
+     return(1);
+    }
+    else if (abs(source) <= 32768)
+     canax[n][axis] = 1;
+   }
   }
 
   for(x=0; x<4; x++)
-  {   
+  {
    if(POVFix(JoyStatus.rgdwPOV[x],-1) != FPOV_CENTER && POVFix(StatusSave[n].rgdwPOV[x],-1) == FPOV_CENTER)
    {
     *guid = JoyGUID[n];
@@ -381,9 +461,10 @@ int DoJoyWaitTest(GUID *guid, uint8 *devicenum, uint16 *buttonnum)
     return(1);
    }
   }
+
   memcpy(&StatusSave[n], &JoyStatus, sizeof(DIJOYSTATE2));
  }
- 
+
  return(0);
 }
 
@@ -395,12 +476,14 @@ void EndJoyWait(HWND hwnd)
  {
   IDirectInputDevice7_Unacquire(Joysticks[n]);
   IDirectInputDevice7_SetCooperativeLevel(Joysticks[n],hwnd,DISCL_FOREGROUND|DISCL_NONEXCLUSIVE);
+  IDirectInputDevice7_Acquire(Joysticks[n]);
  }
 
  /* Do not let the button used to assign a hotkey immediately activate it. */
  memset(HavePolled, 0, sizeof(HavePolled));
  memset(StatusValid, 0, sizeof(StatusValid));
  memset(PreviousValid, 0, sizeof(PreviousValid));
+ memset(WaitStatusValid, 0, sizeof(WaitStatusValid));
 }
 
 int KillJoysticks (void)

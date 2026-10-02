@@ -531,7 +531,7 @@ typedef struct {
 // to something more unified for ines 2.0 specific
 static int not_power2[] =
 {
-	53, 198, 228, 547
+	53, 195, 198, 228, 547
 };
 
 BMAPPINGLocal bmap[] = {
@@ -1136,6 +1136,8 @@ BMAPPINGLocal bmap[] = {
 	{ "J-2083", 623, Mapper623_Init },
 	{ "KL-08/KL-09B", 624, Mapper624_Init },
 	{ "ET-20", 625, Mapper625_Init },
+	{ "90-in-1", 626, Mapper626_Init },
+	{ "", 627, Mapper627_Init },
 	{ "Rainbow Mapper", 682, Mapper682_Init },
 	{ "ET-156",  731,  Mapper731_Init },
 	{ "W-03",  732,  Mapper732_Init },

@@ -1346,69 +1346,176 @@ namespace Mapper_800_0
 		}
 	}
 
+	static inline uint32 ExRAM_Index(
+		uint32 A,
+		uint32 bank,
+		uint32 bank_size,
+		uint32 bank_size_mask,
+		uint32 bank_mask) noexcept
+	{
+		/*
+		 * IMPORTANT:
+		 *
+		 * The CPU-window offset and the selected ExRAM page must be
+		 * calculated independently, then added together.
+		 *
+		 * Do NOT write:
+		 *
+		 *     A & mask + bank * size
+		 *
+		 * because '+' binds more tightly than '&' in C/C++, making it:
+		 *
+		 *     A & (mask + bank * size)
+		 *
+		 * which aliases multiple page numbers onto the same storage.
+		 */
+		return
+			(A & bank_size_mask) +
+			((bank & bank_mask) * bank_size);
+	}
+
 	uint8 ExRAM_5000_Read(uint32 A) noexcept
 	{
-		//uint32 tmp = A & 0x1FFF;
-		//return VPage[tmp >> 10][tmp];
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_5000,
+			ExRAM_5000_BANK_SIZE,
+			ExRAM_5000_BANK_SIZE_MASK,
+			ExRAM_5000_BANK_MASK);
 
-		return ExRAM_5000[A & ExRAM_5000_BANK_SIZE_MASK + reg.exram_5000 * ExRAM_5000_BANK_SIZE];
+		return ExRAM_5000[index];
 	}
 
 	void ExRAM_5000_Write(uint32 A, uint8 V) noexcept
 	{
-		//uint32 tmp = A & 0x1FFF;
-		//VPage[tmp >> 10][tmp] = V;
-		ExRAM_5000[A & ExRAM_5000_BANK_SIZE_MASK + reg.exram_5000 * ExRAM_5000_BANK_SIZE] = V;
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_5000,
+			ExRAM_5000_BANK_SIZE,
+			ExRAM_5000_BANK_SIZE_MASK,
+			ExRAM_5000_BANK_MASK);
+
+		ExRAM_5000[index] = V;
 	}
 
 	uint8 ExRAM_4800_Read(uint32 A) noexcept
 	{
-		return ExRAM_4800[A & ExRAM_4800_BANK_SIZE_MASK + reg.exram_4800 * ExRAM_4800_BANK_SIZE];
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4800,
+			ExRAM_4800_BANK_SIZE,
+			ExRAM_4800_BANK_SIZE_MASK,
+			ExRAM_4800_BANK_MASK);
+
+		return ExRAM_4800[index];
 	}
 
 	void ExRAM_4800_Write(uint32 A, uint8 V) noexcept
 	{
-		ExRAM_4800[A & ExRAM_4800_BANK_SIZE_MASK + reg.exram_4800 * ExRAM_4800_BANK_SIZE] = V;
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4800,
+			ExRAM_4800_BANK_SIZE,
+			ExRAM_4800_BANK_SIZE_MASK,
+			ExRAM_4800_BANK_MASK);
+
+		ExRAM_4800[index] = V;
 	}
 
 	uint8 ExRAM_4400_Read(uint32 A) noexcept
 	{
-		return ExRAM_4400[A & ExRAM_4400_BANK_SIZE_MASK + reg.exram_4400 * ExRAM_4400_BANK_SIZE];
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4400,
+			ExRAM_4400_BANK_SIZE,
+			ExRAM_4400_BANK_SIZE_MASK,
+			ExRAM_4400_BANK_MASK);
+
+		return ExRAM_4400[index];
 	}
 
 	void ExRAM_4400_Write(uint32 A, uint8 V) noexcept
 	{
-		ExRAM_4400[A & ExRAM_4400_BANK_SIZE_MASK + reg.exram_4400 * ExRAM_4400_BANK_SIZE] = V;
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4400,
+			ExRAM_4400_BANK_SIZE,
+			ExRAM_4400_BANK_SIZE_MASK,
+			ExRAM_4400_BANK_MASK);
+
+		ExRAM_4400[index] = V;
 	}
 
 	uint8 ExRAM_4200_Read(uint32 A) noexcept
 	{
-		return ExRAM_4200[A & ExRAM_4200_BANK_SIZE_MASK + reg.exram_4200 * ExRAM_4200_BANK_SIZE];
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4200,
+			ExRAM_4200_BANK_SIZE,
+			ExRAM_4200_BANK_SIZE_MASK,
+			ExRAM_4200_BANK_MASK);
+
+		return ExRAM_4200[index];
 	}
 
 	void ExRAM_4200_Write(uint32 A, uint8 V) noexcept
 	{
-		ExRAM_4200[A & ExRAM_4200_BANK_SIZE_MASK + reg.exram_4200 * ExRAM_4200_BANK_SIZE] = V;
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4200,
+			ExRAM_4200_BANK_SIZE,
+			ExRAM_4200_BANK_SIZE_MASK,
+			ExRAM_4200_BANK_MASK);
+
+		ExRAM_4200[index] = V;
 	}
 
 	uint8 ExRAM_4100_Read(uint32 A) noexcept
 	{
-		return ExRAM_4100[A & ExRAM_4100_BANK_SIZE_MASK + reg.exram_4100 * ExRAM_4100_BANK_SIZE];
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4100,
+			ExRAM_4100_BANK_SIZE,
+			ExRAM_4100_BANK_SIZE_MASK,
+			ExRAM_4100_BANK_MASK);
+
+		return ExRAM_4100[index];
 	}
 
 	void ExRAM_4100_Write(uint32 A, uint8 V) noexcept
 	{
-		ExRAM_4100[A & ExRAM_4100_BANK_SIZE_MASK + reg.exram_4100 * ExRAM_4100_BANK_SIZE] = V;
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4100,
+			ExRAM_4100_BANK_SIZE,
+			ExRAM_4100_BANK_SIZE_MASK,
+			ExRAM_4100_BANK_MASK);
+
+		ExRAM_4100[index] = V;
 	}
 
 	uint8 ExRAM_4080_Read(uint32 A) noexcept
 	{
-		return ExRAM_4080[A & ExRAM_4080_BANK_SIZE_MASK + reg.exram_4080 * ExRAM_4080_BANK_SIZE];
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4080,
+			ExRAM_4080_BANK_SIZE,
+			ExRAM_4080_BANK_SIZE_MASK,
+			ExRAM_4080_BANK_MASK);
+
+		return ExRAM_4080[index];
 	}
 
 	void ExRAM_4080_Write(uint32 A, uint8 V) noexcept
 	{
-		ExRAM_4080[A & ExRAM_4080_BANK_SIZE_MASK + reg.exram_4080 * ExRAM_4080_BANK_SIZE] = V;
+		const uint32 index = ExRAM_Index(
+			A,
+			reg.exram_4080,
+			ExRAM_4080_BANK_SIZE,
+			ExRAM_4080_BANK_SIZE_MASK,
+			ExRAM_4080_BANK_MASK);
+
+		ExRAM_4080[index] = V;
 	}
 
 	void SetPRGReg(int index, uint32 bank) noexcept
@@ -1752,7 +1859,7 @@ namespace Mapper_800_0
 		ExRAM_4400 = static_cast<uint8_t*>(FCEU_gmalloc(ExRAM_4400_DATA_SIZE));
 		if (ExRAM_4400)
 		{
-			AddExState(ExRAM_4800, ExRAM_4400_DATA_SIZE, 0, "4400");
+			AddExState(ExRAM_4400, ExRAM_4400_DATA_SIZE, 0, "4400");
 		}
 
 		ExRAM_4200 = static_cast<uint8_t*>(FCEU_gmalloc(ExRAM_4200_DATA_SIZE));

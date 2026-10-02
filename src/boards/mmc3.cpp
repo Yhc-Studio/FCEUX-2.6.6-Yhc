@@ -1075,28 +1075,263 @@ void Mapper194_Init(CartInfo *info) {
 }
 
 // ---------------------------- Mapper 195 -------------------------------
-static void M195CW(uint32 A, uint8 V) {
-	if (V <= 3)	// Crystalis (c).nes, Captain Tsubasa Vol 2 - Super Striker (C)
-		setchr1r(0x10, A, V);
+// ---------------------------- Mapper 195 -------------------------------
+
+static uint8* M195_XRAM = NULL;
+static uint32 M195_prgbanks = 64;
+static int M195_mirror = MI_H;
+
+static uint8 M195_chrMode = 0x82;
+static uint8 M195_dynamicCHR = 0;
+static uint8 M195_chrBank[8];
+
+static writefunc M195_B2007 = NULL;
+static uint8 M195_B2007Hooked = 0;
+
+static bool M195IsCHRBankRAM(uint8 bank) {
+	if (!M195_dynamicCHR)
+		return bank <= 3;
+
+	switch (M195_chrMode) {
+	case 0x80:
+		return bank >= 0x28 && bank <= 0x2B;
+
+	case 0x82:
+		return bank <= 0x03;
+
+	case 0x88:
+		return bank >= 0x4C && bank <= 0x4F;
+
+	case 0x8A:
+		return bank >= 0x64 && bank <= 0x67;
+
+	case 0xC0:
+		return bank >= 0x46 && bank <= 0x47;
+
+	case 0xC2:
+		return bank >= 0x7C && bank <= 0x7D;
+
+	case 0xC8:
+		return bank >= 0x0A && bank <= 0x0B;
+
+	case 0xCA:
+	default:
+		return false;
+	}
+}
+
+static void M195MapCHR(uint32 A, uint8 V) {
+	if (M195IsCHRBankRAM(V))
+		setchr1r(0x10, A, V & 7);
 	else
 		setchr1r(0, A, V);
 }
 
-static void M195Power(void) {
-	GenMMC3Power();
-	setprg4r(0x10, 0x5000, 2);
-	SetWriteHandler(0x5000, 0x5fff, CartBW);
-	SetReadHandler(0x5000, 0x5fff, CartBR);
+static void M195SyncCHR(void) {
+	for (int i = 0; i < 8; i++)
+		M195MapCHR(i << 10, M195_chrBank[i]);
 }
 
-void Mapper195_Init(CartInfo *info) {
-	GenMMC3_Init(info, 512, 256, 16, info->battery);
+static bool M195DecodeCHRControl(uint8 bank, uint8* mode) {
+	if (!(bank & 0x80))
+		return false;
+
+	if (bank & 0x10) {
+		*mode = 0xCA;
+		return true;
+	}
+
+	*mode = bank & 0xCA;
+	return true;
+}
+
+static void M195CW(uint32 A, uint8 V) {
+	int slot = (A >> 10) & 7;
+
+	M195_chrBank[slot] = V;
+	M195MapCHR(A, V);
+}
+
+static void M195PW(uint32 A, uint8 V) {
+	if (V == 0xFE)
+		V = M195_prgbanks - 2;
+	else if (V == 0xFF)
+		V = M195_prgbanks - 1;
+	else
+		V %= M195_prgbanks;
+
+	setprg8(A, V);
+}
+
+static DECLFW(M195Write2007) {
+	uint32 ppuA = FCEUPPU_PeekAddress() & 0x3FFF;
+
+	bool changeMode = false;
+	uint8 newMode = M195_chrMode;
+
+	if (ppuA < 0x2000) {
+		int slot = (ppuA >> 10) & 7;
+		uint8 bank = M195_chrBank[slot];
+
+		if (!M195IsCHRBankRAM(bank))
+			changeMode = M195DecodeCHRControl(bank, &newMode);
+	}
+
+	if (M195_B2007)
+		M195_B2007(A, V);
+
+	if (changeMode) {
+		M195_chrMode = newMode;
+		M195_dynamicCHR = 1;
+		M195SyncCHR();
+	}
+}
+
+static void M195InstallPPUWriteHook(void) {
+	if (!M195_B2007Hooked) {
+		M195_B2007 = GetWriteHandler(0x2007);
+		M195_B2007Hooked = 1;
+	}
+
+	for (uint32 A = 0x2007; A < 0x4000; A += 8)
+		SetWriteHandler(A, A, M195Write2007);
+}
+
+static void M195RemovePPUWriteHook(void) {
+	if (!M195_B2007Hooked || !M195_B2007)
+		return;
+
+	for (uint32 A = 0x2007; A < 0x4000; A += 8)
+		SetWriteHandler(A, A, M195_B2007);
+
+	M195_B2007 = NULL;
+	M195_B2007Hooked = 0;
+}
+
+static void M195Power(void) {
+	M195_chrMode = 0x82;
+	M195_dynamicCHR = 0;
+	memset(M195_chrBank, 0, sizeof(M195_chrBank));
+
+	GenMMC3Power();
+
+	setmirror(M195_mirror);
+
+	if (CHRRAM)
+		memset(CHRRAM, 0, CHRRAMSIZE);
+
+	if (!(mmc3opts & 2) && WRAM)
+		memset(WRAM, 0, WRAMSIZE);
+
+	if (M195_XRAM)
+		memset(M195_XRAM, 0, 0x1000);
+
+	setprg4r(0x12, 0x5000, 0);
+
+	SetWriteHandler(0x5000, 0x5FFF, CartBW);
+	SetReadHandler(0x5000, 0x5FFF, CartBR);
+
+	M195InstallPPUWriteHook();
+}
+
+static void M195Close(void) {
+	M195RemovePPUWriteHook();
+
+	if (M195_XRAM) {
+		FCEU_gfree(M195_XRAM);
+		M195_XRAM = NULL;
+	}
+
+	GenMMC3Close();
+}
+
+void Mapper195_Init(CartInfo* info) {
+	int prgbytes =
+		(int)(info->totalFileSize - (uint32)VROM_size * 8192);
+
+	if (prgbytes < 512 * 1024 ||
+		prgbytes > 4096 * 1024 ||
+		(prgbytes & 0x3FFF))
+	{
+		prgbytes = 512 * 1024;
+	}
+
+	M195_prgbanks = prgbytes >> 13;
+	M195_mirror = info->mirror;
+
+	GenMMC3_Init(
+		info,
+		512,
+		256,
+		16,
+		info->battery
+	);
+
+	PRGmask8[0] = 0xFF;
+
+	pwrap = M195PW;
 	cwrap = M195CW;
+
 	info->Power = M195Power;
-	CHRRAMSIZE = 4096;
+	info->Close = M195Close;
+
+	CHRRAMSIZE = 8192;
 	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
-	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
-	AddExState(CHRRAM, CHRRAMSIZE, 0, "CHRR");
+
+	if (CHRRAM) {
+		memset(CHRRAM, 0, CHRRAMSIZE);
+		SetupCartCHRMapping(
+			0x10,
+			CHRRAM,
+			CHRRAMSIZE,
+			1
+		);
+		AddExState(
+			CHRRAM,
+			CHRRAMSIZE,
+			0,
+			"CHRR"
+		);
+	}
+
+	M195_XRAM = (uint8*)FCEU_gmalloc(0x1000);
+
+	if (M195_XRAM) {
+		memset(M195_XRAM, 0, 0x1000);
+		SetupCartPRGMapping(
+			0x12,
+			M195_XRAM,
+			0x1000,
+			1
+		);
+		AddExState(
+			M195_XRAM,
+			0x1000,
+			0,
+			"M5KX"
+		);
+	}
+
+	AddExState(
+		&M195_chrMode,
+		1,
+		0,
+		"M1CM"
+	);
+
+	AddExState(
+		&M195_dynamicCHR,
+		1,
+		0,
+		"M1DY"
+	);
+
+	AddExState(
+		M195_chrBank,
+		sizeof(M195_chrBank),
+		0,
+		"M1CB"
+	);
 }
 
 // ---------------------------- Mapper 196 -------------------------------
@@ -1328,6 +1563,7 @@ void Mapper367_Init(CartInfo* info) {
 	info->Reset = M205_367Reset;
 	AddExState(EXPREGS, 1, 0, "EXPR");
 }
+
 
 /* --------------------------- GN-45 BOARD ------------------------------ */
 

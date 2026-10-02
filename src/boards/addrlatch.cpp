@@ -1063,3 +1063,22 @@ static void M731Sync(void) {
 void Mapper731_Init(CartInfo* info) {
 	Latch_Init(info, M731Sync, NULL, 0x0000, 0x8000, 0xFFFF, 0);
 }
+
+/*------------------ Map 626 ---------------------------*/
+static void M626Sync(void) {
+	if (latche & 0x200)
+		setprg32(0x8000, latche);
+	else {
+		setprg16(0x8000, latche << 1 | latche >> 8 & 1);
+		setprg16(0xC000, latche << 1 | latche >> 8 & 1);
+	}
+	setchr8(0);
+	if (latche & 0x80)
+		setmirror(MI_H);
+	else
+		setmirror(MI_V);
+}
+
+void Mapper626_Init(CartInfo* info) {
+	Latch_Init(info, M626Sync, NULL, 0x0000, 0x8000, 0xFFFF, 0);
+}
