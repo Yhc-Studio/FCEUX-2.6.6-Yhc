@@ -1989,6 +1989,9 @@
     <ClCompile Include="..\src\boards\104.cpp">
       <Filter>boards</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\boards\627.cpp">
+      <Filter>boards</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\drivers\common\args.h">
