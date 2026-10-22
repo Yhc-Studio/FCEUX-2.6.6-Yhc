@@ -116,6 +116,10 @@ extern void ResetCyclesCounter();
 extern void ResetInstructionsCounter();
 extern void ResetDebugStatisticsDeltaCounters();
 extern void IncrementInstructionsCounters();
+// Stage 3.6.6b: batch instruction counters in the normal CPU path.
+extern void IncrementInstructionsCountersBy(uint64 count);
+// Stage 3.6.6b: true when per-instruction debugger decoding/checks are required.
+extern bool FCEUI_DebugCycleNeeded();
 //-------------
 
 //internal variables that debuggers will want access to

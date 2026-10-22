@@ -45,8 +45,11 @@ void X6502_Debug(void (*CPUHook)(X6502 *),
 //#else
 //void X6502_Run(int32 cycles);
 //#endif
+// Stage 3.6.6b: automatic normal/debug CPU execution routing.
+void X6502_RunNormal(int32 cycles);
 void X6502_RunDebug(int32 cycles);
-#define X6502_Run(x) X6502_RunDebug(x)
+void X6502_RunAuto(int32 cycles);
+#define X6502_Run(x) X6502_RunAuto(x)
 //------------
 
 extern uint32 timestamp;

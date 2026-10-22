@@ -516,8 +516,10 @@ void X6502_Power(void)
  StackAddrBackup = -1;
 }
 
-void X6502_Run(int32 cycles)
+template <bool Stage366bDebugPath>
+static void X6502_RunCore(int32 cycles)
 {
+  uint64 stage366bInstructionBatch = 0;
   if(PAL)
    cycles*=15;    // 15*4=60
   else
@@ -579,15 +581,28 @@ extern int test; test++;
     if(_count<=0)
     {
      _PI=_P;
+     if (!Stage366bDebugPath)
+     {
+      if (stage366bInstructionBatch)
+       IncrementInstructionsCountersBy(stage366bInstructionBatch);
+      StackAddrBackup = X.S;
+     }
      return;
      } //Should increase accuracy without a
               //major speed hit.
    }
 
-	//will probably cause a major speed decrease on low-end systems
-   DEBUG( DebugCycle() );
 
-   IncrementInstructionsCounters();
+	// Stage 3.6.6b: ordinary gameplay skips the expensive debugger decoder.
+   if (Stage366bDebugPath)
+   {
+    DEBUG( DebugCycle() );
+    IncrementInstructionsCounters();
+   }
+   else
+   {
+    ++stage366bInstructionBatch;
+   }
 
    _PI=_P;
    b1=RdMem(_PC);
@@ -610,7 +625,35 @@ extern int test; test++;
     #include "ops.inc"
    }
   }
+  if (!Stage366bDebugPath)
+  {
+   if (stage366bInstructionBatch)
+    IncrementInstructionsCountersBy(stage366bInstructionBatch);
+   // Keep stack tracking synchronized before a future switch to Debug path.
+   StackAddrBackup = X.S;
+  }
 }
+
+void X6502_RunNormal(int32 cycles)
+{
+ X6502_RunCore<false>(cycles);
+}
+
+void X6502_RunDebug(int32 cycles)
+{
+ X6502_RunCore<true>(cycles);
+}
+
+void X6502_RunAuto(int32 cycles)
+{
+ // Stage 3.5 Lua memory hooks may invoke debugger APIs from inside CPU callbacks.
+ // Keep their instruction/debug timing identical to the original path.
+ if (readMemHook || writeMemHook || execMemHook || FCEUI_DebugCycleNeeded())
+  X6502_RunDebug(cycles);
+ else
+  X6502_RunNormal(cycles);
+}
+
 
 //--------------------------
 //---Called from debuggers

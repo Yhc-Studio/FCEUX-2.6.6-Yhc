@@ -10,6 +10,12 @@
 #include "driver.h"
 #include "ppu.h"
 
+#ifdef __WIN_DRIVER__
+// Stage 3.6.6b Win32 debugger/trace state.
+#include "drivers/win/debugger.h"
+extern volatile int logging;
+#endif
+
 #include "x6502abbrev.h"
 
 #include <cstdlib>
@@ -610,6 +616,27 @@ static DebuggerState dbgstate;
 
 DebuggerState &FCEUI_Debugger() { return dbgstate; }
 
+// Stage 3.6.6b: keep the expensive per-instruction debugger decoder out of
+// ordinary gameplay, but fall back to the original path whenever a tool needs it.
+bool FCEUI_DebugCycleNeeded()
+{
+#ifdef __WIN_DRIVER__
+	// If Debugger is open or Trace Logger is recording, preserve exact old behavior.
+	if (hDebug || logging)
+		return true;
+#else
+	// Only the native Win32 path is optimized by this stage.
+	return true;
+#endif
+
+	return debug_loggingCD ||
+		numWPs ||
+		dbgstate.step || dbgstate.runline || dbgstate.stepout ||
+		watchpoint[64].flags || dbgstate.badopbreak ||
+		break_on_cycles || break_on_instructions || break_asap ||
+		break_on_unlogged_code || break_on_unlogged_data;
+}
+
 void ResetDebugStatisticsCounters()
 {
 	ResetCyclesCounter();
@@ -632,6 +659,12 @@ void IncrementInstructionsCounters()
 {
 	total_instructions++;
 	delta_instructions++;
+}
+
+void IncrementInstructionsCountersBy(uint64 count)
+{
+	total_instructions += count;
+	delta_instructions += count;
 }
 
 bool CondForbidTest(int bp_num) {
