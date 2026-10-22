@@ -153,6 +153,8 @@ static inline bool WinManualFastForwardMode()
 	return (!WinAviDumpSafeMode() && fps_scale_unpaused >= WIN_MANUAL_FAST_FORWARD_THRESHOLD);
 }
 
+
+
 static bool WinShouldUpdateHeavyToolWindows()
 {
 	if (!WinManualFastForwardMode() || FCEUI_EmulationPaused())
@@ -1105,11 +1107,30 @@ void FCEUD_Update(uint8* XBuf, int32* Buffer, int Count)
 	const bool aviDumpSafeMode = WinAviDumpSafeMode();
 	const bool manualFastForward = WinManualFastForwardMode();
 
-	win_SoundSetScale(fps_scale); //If turboing and mute turbo is true, bypass this
+	// Stage 3.6.2: Mute-Turbo sound fast path.
+	// Keep one SoundSetScale call on entry so pending TrashSound() is still processed,
+	// then bypass the steady-state SoundSetScale path until Turbo/mute bypass ends.
+	// AVI dump safe mode intentionally keeps the original audio path.
+	const bool muteTurboSoundBypass = (muteTurbo && turbo && !aviDumpSafeMode);
+	static bool stage362MuteTurboSoundPrepared = false;
+
+	if (muteTurboSoundBypass)
+	{
+		if (!stage362MuteTurboSoundPrepared)
+		{
+			win_SoundSetScale(fps_scale); //If turboing and mute turbo is true, bypass this
+			stage362MuteTurboSoundPrepared = true;
+		}
+	}
+	else
+	{
+		stage362MuteTurboSoundPrepared = false;
+		win_SoundSetScale(fps_scale); //If turboing and mute turbo is true, bypass this
+	}
 
 	//write all the sound we generated.
 	// AVI recording must not inherit mute-turbo's sound bypass, or A/V sync can break.
-	if (soundo && Buffer && Count && !(muteTurbo && turbo && !aviDumpSafeMode)) {
+	if (soundo && Buffer && Count && !muteTurboSoundBypass) {
 		win_SoundWriteData(Buffer, Count); //If turboing and mute turbo is true, bypass this
 	}
 

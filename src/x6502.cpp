@@ -44,13 +44,91 @@ void (*MapIRQHook)(int a);
  if(!overclocking) soundtimestamp+=__x; \
 }
 
+// FCEUX 2.7-style low-overhead hook lists.  These are intentionally null while
+// Lua (or another client) has no CPU memory hook registered.
+static X6502_MemHook* readMemHook = nullptr;
+static X6502_MemHook* writeMemHook = nullptr;
+static X6502_MemHook* execMemHook = nullptr;
+
+static X6502_MemHook** X6502_GetMemHookList(enum X6502_MemHook::Type type)
+{
+    switch (type)
+    {
+    case X6502_MemHook::Read:  return &readMemHook;
+    case X6502_MemHook::Write: return &writeMemHook;
+    case X6502_MemHook::Exec:  return &execMemHook;
+    default:                   return nullptr;
+    }
+}
+
+void X6502_MemHook::Add(enum X6502_MemHook::Type type,
+    void (*func)(unsigned int address, unsigned int value, void *userData),
+    void *userData)
+{
+    X6502_MemHook **hookStart = X6502_GetMemHookList(type);
+    if (hookStart == nullptr || func == nullptr)
+        return;
+
+    X6502_MemHook *tail = nullptr;
+    for (X6502_MemHook *hook = *hookStart; hook != nullptr; hook = hook->next)
+    {
+        if (hook->func == func && hook->userData == userData)
+        {
+            ++hook->refCount;
+            return;
+        }
+        tail = hook;
+    }
+
+    X6502_MemHook *newHook = new X6502_MemHook();
+    newHook->type = type;
+    newHook->func = func;
+    newHook->userData = userData;
+    newHook->refCount = 1;
+
+    if (tail != nullptr)
+        tail->next = newHook;
+    else
+        *hookStart = newHook;
+}
+
+void X6502_MemHook::Remove(enum X6502_MemHook::Type type,
+    void (*func)(unsigned int address, unsigned int value, void *userData),
+    void *userData)
+{
+    X6502_MemHook **hookStart = X6502_GetMemHookList(type);
+    if (hookStart == nullptr || func == nullptr)
+        return;
+
+    X6502_MemHook *prev = nullptr;
+    X6502_MemHook *hook = *hookStart;
+    while (hook != nullptr)
+    {
+        if (hook->func == func && hook->userData == userData)
+        {
+            if (--hook->refCount <= 0)
+            {
+                if (prev != nullptr)
+                    prev->next = hook->next;
+                else
+                    *hookStart = hook->next;
+                delete hook;
+            }
+            return;
+        }
+        prev = hook;
+        hook = hook->next;
+    }
+}
+
 //normal memory read
 static INLINE uint8 RdMem(unsigned int A)
 {
  _DB=ARead[A](A);
- #ifdef _S9XLUA_H
- CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
- #endif
+  if (readMemHook)
+  {
+      readMemHook->call(A, _DB);
+  }
  return(_DB);
 }
 
@@ -58,17 +136,19 @@ static INLINE uint8 RdMem(unsigned int A)
 static INLINE void WrMem(unsigned int A, uint8 V)
 {
 	BWrite[A](A,V);
-	#ifdef _S9XLUA_H
-	CallRegisteredLuaMemHook(A, 1, V, LUAMEMHOOK_WRITE);
-	#endif
+  if (writeMemHook)
+  {
+      writeMemHook->call(A, V);
+  }
 }
 
 static INLINE uint8 RdRAM(unsigned int A)
 {
   _DB=ARead[A](A);
-  #ifdef _S9XLUA_H
-  CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
-  #endif
+  if (readMemHook)
+  {
+      readMemHook->call(A, _DB);
+  }
   //bbit edited: this was changed so cheat substituion would work
   // return(_DB=RAM[A]);
   return(_DB);
@@ -77,18 +157,20 @@ static INLINE uint8 RdRAM(unsigned int A)
 static INLINE void WrRAM(unsigned int A, uint8 V)
 {
 	RAM[A]=V;
-	#ifdef _S9XLUA_H
-	CallRegisteredLuaMemHook(A, 1, V, LUAMEMHOOK_WRITE);
-	#endif
+  if (writeMemHook)
+  {
+      writeMemHook->call(A, V);
+  }
 }
 
 uint8 X6502_DMR(uint32 A)
 {
  ADDCYC(1);
  _DB=ARead[A](A);
- #ifdef _S9XLUA_H
- CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
- #endif
+  if (readMemHook)
+  {
+      readMemHook->call(A, _DB);
+  }
  return(_DB);
 }
 
@@ -96,9 +178,10 @@ void X6502_DMW(uint32 A, uint8 V)
 {
  ADDCYC(1);
  BWrite[A](A,V);
- #ifdef _S9XLUA_H
- CallRegisteredLuaMemHook(A, 1, V, LUAMEMHOOK_WRITE);
- #endif
+  if (writeMemHook)
+  {
+      writeMemHook->call(A, V);
+  }
 }
 
 #define PUSH(V) \
@@ -517,9 +600,10 @@ extern int test; test++;
    
    if (!overclocking)
     FCEU_SoundCPUHook(temp);
-   #ifdef _S9XLUA_H
-   CallRegisteredLuaMemHook(_PC, 1, 0, LUAMEMHOOK_EXEC);
-   #endif
+   if (execMemHook)
+   {
+       execMemHook->call(_PC, 0);
+   }
    _PC++;
    switch(b1)
    {

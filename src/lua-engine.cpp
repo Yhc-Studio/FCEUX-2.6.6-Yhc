@@ -118,6 +118,27 @@ bool DemandLua()
 #endif
 }
 
+// Bridge the existing Lua region matcher to the 2.7-style X6502 hook list.
+// These functions are registered only while a Lua state exists, removing the
+// unconditional function call from every CPU read/write/execute in normal play.
+static void luaReadMemHook(unsigned int address, unsigned int value, void *userData)
+{
+    (void)userData;
+    CallRegisteredLuaMemHook(address, 1, value, LUAMEMHOOK_READ);
+}
+
+static void luaWriteMemHook(unsigned int address, unsigned int value, void *userData)
+{
+    (void)userData;
+    CallRegisteredLuaMemHook(address, 1, value, LUAMEMHOOK_WRITE);
+}
+
+static void luaExecMemHook(unsigned int address, unsigned int value, void *userData)
+{
+    (void)userData;
+    CallRegisteredLuaMemHook(address, 1, value, LUAMEMHOOK_EXEC);
+}
+
 extern "C"
 {
 #include <lua.h>
@@ -6504,6 +6525,11 @@ int FCEU_LoadLuaCode(const char* filename, const char* arg)
 			lua_newtable(L);
 			lua_setfield(L, LUA_REGISTRYINDEX, luaMemHookTypeStrings[i]);
 		}
+
+
+        X6502_MemHook::Add(X6502_MemHook::Read,  luaReadMemHook,  nullptr);
+        X6502_MemHook::Add(X6502_MemHook::Write, luaWriteMemHook, nullptr);
+        X6502_MemHook::Add(X6502_MemHook::Exec,  luaExecMemHook,  nullptr);
 	}
 
 	// We make our thread NOW because we want it at the bottom of the stack.
@@ -6620,6 +6646,11 @@ void FCEU_LuaStop() {
 
 	//already killed
 	if (!L) return;
+
+
+    X6502_MemHook::Remove(X6502_MemHook::Read,  luaReadMemHook,  nullptr);
+    X6502_MemHook::Remove(X6502_MemHook::Write, luaWriteMemHook, nullptr);
+    X6502_MemHook::Remove(X6502_MemHook::Exec,  luaExecMemHook,  nullptr);
 
 	// Since the script is exiting, we want to prevent an infinite loop.
 	// CallExitFunction() > HandleCallbackError() > FCEU_LuaStop() > CallExitFunction() ...

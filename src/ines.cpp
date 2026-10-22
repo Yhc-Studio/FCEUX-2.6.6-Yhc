@@ -120,6 +120,11 @@ void iNESGI(GI h) { //bbit edited: removed static keyword
 			FCEU_free(VROM);
 			VROM = NULL;
 		}
+		if (MiscROM) {
+			FCEU_free(MiscROM);
+			MiscROM = NULL;
+		}
+		MiscROM_size = 0;
 		if (trainerpoo) {
 			free(trainerpoo);
 			trainerpoo = NULL;
@@ -531,7 +536,7 @@ typedef struct {
 // to something more unified for ines 2.0 specific
 static int not_power2[] =
 {
-	53, 195, 198, 228, 547
+	23, 53, 195, 198, 228, 547
 };
 
 BMAPPINGLocal bmap[] = {
@@ -1460,10 +1465,13 @@ int iNESLoad(const char* name, FCEUFILE* fp, int OverwriteVidMode) {
 init_error:
 	if (ROM) free(ROM);
 	if (VROM) free(VROM);
+	if (MiscROM) free(MiscROM);
 	if (trainerpoo) free(trainerpoo);
 	if (ExtraNTARAM) free(ExtraNTARAM);
 	ROM = NULL;
 	VROM = NULL;
+	MiscROM = NULL;
+	MiscROM_size = 0;
 	trainerpoo = NULL;
 	ExtraNTARAM = NULL;
 	return LOADER_HANDLED_ERROR;

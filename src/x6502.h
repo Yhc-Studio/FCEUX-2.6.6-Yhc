@@ -92,5 +92,37 @@ void X6502_IRQEnd(int w);
 
 int X6502_GetOpcodeCycles( int op );
 
+// FCEUX 2.7-style low-overhead CPU memory hook dispatcher.
+// When no hook is registered, x6502's hot path only performs a null-pointer check.
+class X6502_MemHook
+{
+public:
+    enum Type { Read = 0, Write, Exec } type;
+
+    static void Add(enum Type type,
+        void (*func)(unsigned int address, unsigned int value, void *userData),
+        void *userData = nullptr);
+    static void Remove(enum Type type,
+        void (*func)(unsigned int address, unsigned int value, void *userData),
+        void *userData = nullptr);
+
+    inline void call(unsigned int address, unsigned int value)
+    {
+        // Iterative dispatch avoids recursion when more than one hook is registered.
+        X6502_MemHook *hook = this;
+        while (hook != nullptr)
+        {
+            hook->func(address, value, hook->userData);
+            hook = hook->next;
+        }
+    }
+
+private:
+    void (*func)(unsigned int address, unsigned int value, void *userData) = nullptr;
+    void *userData = nullptr;
+    X6502_MemHook *next = nullptr;
+    int refCount = 0;
+};
+
 #define _X6502H
 #endif

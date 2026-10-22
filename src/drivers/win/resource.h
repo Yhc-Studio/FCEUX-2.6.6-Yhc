@@ -443,6 +443,7 @@
 #define IDC_TVASPECT_Y                  405
 #define IDC_VIDEOCONFIG_SCALER_WIN      406
 #define CHECK_ENABLE_MICROPHONE         407
+#define IDC_TVASPECT_PRESET              408
 #define CTL_TINT_TRACKBAR               500
 #define CTL_VOLUME_TRACKBAR             500
 #define IDC_SCANLINE_FIRST_NTSC         500

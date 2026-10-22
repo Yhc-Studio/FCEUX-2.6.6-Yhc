@@ -38,6 +38,12 @@ static unsigned int keys[256] = {0,}; // with repeat
 static unsigned int keys_nr[256] = {0,}; // non-repeating
 static unsigned int keys_jd[256] = {0,}; // just-down
 static unsigned int keys_jd_lock[256] = {0,}; // just-down released lock
+// Stage 3.6.3 v1.1: monotonically changes when raw physical key state changes.
+static unsigned int g_stage363KeyboardStateGeneration = 1;
+unsigned int KeyboardStateGeneration(void)
+{
+	return g_stage363KeyboardStateGeneration;
+}
 extern ButtConfig autoHoldKeys, autoHoldClearKeys;
 int ctr=0;
 void KeyboardUpdateState(void)
@@ -64,6 +70,19 @@ void KeyboardUpdateState(void)
 		memset(tk,0,256);
 		IDirectInputDevice7_Acquire(lpdid);
 		break;
+	}
+
+	// Stage 3.6.3 v1.1: tiny O(1)-consumer generation source for HandleHotkeys().
+	// This replaces the v1 per-frame 256-key bitset rebuild in input.cpp.
+	static unsigned char stage363v11PreviousRaw[256] = {0};
+	static bool stage363v11RawInitialized = false;
+	if (!stage363v11RawInitialized || memcmp(stage363v11PreviousRaw, tk, sizeof(tk)) != 0)
+	{
+		memcpy(stage363v11PreviousRaw, tk, sizeof(tk));
+		++g_stage363KeyboardStateGeneration;
+		if (!g_stage363KeyboardStateGeneration)
+			g_stage363KeyboardStateGeneration = 1;
+		stage363v11RawInitialized = true;
 	}
 
 	//process keys

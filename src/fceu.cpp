@@ -121,14 +121,17 @@ static unsigned int pauseTimer = 0;
 
 
 FCEUGI::FCEUGI()
-	: filename(0),
-	archiveFilename(0)
 {
-	//printf("%08x",opsize); // WTF?!
 }
 
 FCEUGI::~FCEUGI()
 {
+	if (name)
+	{
+		free(name);
+		name = nullptr;
+	}
+
 	if (filename)
 	{
 		free(filename);
@@ -473,12 +476,12 @@ FCEUGI* FCEUI_LoadGameVirtual(const char* name, int OverwriteVidMode, bool silen
 
 	FCEU_CloseGame();
 	GameInfo = new FCEUGI();
-	memset((void*)GameInfo, 0, sizeof(FCEUGI));
 
 	GameInfo->filename = strdup(fp->filename.c_str());
 	if (fp->archiveFilename != "")
 		GameInfo->archiveFilename = strdup(fp->archiveFilename.c_str());
 	GameInfo->archiveCount = fp->archiveCount;
+	GameInfo->archiveIndex = fp->archiveIndex;
 
 	GameInfo->soundchan = 0;
 	GameInfo->soundrate = 0;

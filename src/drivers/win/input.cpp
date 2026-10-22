@@ -222,11 +222,18 @@ uint32 GetGamepadPressedImmediate()
 //             e.g. do not trigger "F1" if "Ctrl+F1" is pressed
 int DTestButton(ButtConfig *bc, uint8_t just_down, uint8_t block_meta)
 {
+	// Stage 3.6.2: empty mappings need no keyboard/joystick work.
+	if (bc->NumC == 0)
+		return 0;
+	bool stage362_hasJoystickBinding = false;
 	unsigned int *keys_data = !just_down ? GetKeyboard_nr() : GetKeyboard_jd();
 	unsigned int *keys_data_nr = GetKeyboard_nr();
 
 	for (int x = 0; x < bc->NumC; x++)
 	{
+		// Stage 3.6.2: only enter DTestButtonJoy when this mapping really contains a joystick binding.
+		if (bc->ButtType[x] == BUTTC_JOYSTICK)
+			stage362_hasJoystickBinding = true;
 		if (bc->ButtType[x] == BUTTC_KEYBOARD)
 		{
 			int cmd = bc->ButtonNum[x];
@@ -279,7 +286,12 @@ int DTestButton(ButtConfig *bc, uint8_t just_down, uint8_t block_meta)
 			}
 		}
 	}
-	if (DTestButtonJoy(bc, just_down)) return 1;
+	if (stage362_hasJoystickBinding)
+	{
+		if (DTestButtonJoy(bc, just_down)) {
+			return 1;
+		}
+	}
 	return 0;
 }
 
@@ -402,6 +414,7 @@ void UpdateGamepad(bool snes)
 
 	if(!snes)
 		JSreturn=JS;
+
 }
 
 ButtConfig powerpadsc[2][12]={
@@ -499,6 +512,7 @@ static uint8 fkbkeys[0x48];
 static uint8 suborkbkeys[0x65];
 
 void KeyboardUpdateState(void); //mbg merge 7/17/06 yech had to add this
+unsigned int KeyboardStateGeneration(void);
 
 /* Hotkeys follow the Background Input option.  A final input update can
    occur while a click is transferring focus to another application, so
@@ -517,11 +531,49 @@ static bool HotkeyInputAllowed()
 	return foregroundProcess == GetCurrentProcessId();
 }
 
+/* Stage 3.6.3 v1.1: cache joystick-hotkey presence once per Turbo hold.
+   The v1 implementation rescanned the whole command map every frame; that
+   guard cost almost as much as the hotkey scan it was trying to avoid. */
+static bool Stage363v11_HotkeyMapHasJoystick()
+{
+    for (int c = 0; c < EMUCMD_MAX; c++)
+    {
+        ButtConfig* bc = &FCEUD_CommandMapping[c];
+        for (unsigned int x = 0; x < bc->NumC; x++)
+            if (bc->ButtType[x] == BUTTC_JOYSTICK)
+                return true;
+    }
+    return false;
+}
+
 void HandleHotkeys()
 {
-	if (!HotkeyInputAllowed())
-		return;
-
+	// Stage 3.6.3 v1.1: O(1) steady-state Turbo hotkey guard.
+	// KeyboardStateGeneration() changes only when the physical keyboard state changes.
+	static bool stage363v11TurboActive = false;
+	static bool stage363v11TurboHasJoystickHotkeys = false;
+	static unsigned int stage363v11LastKeyboardGeneration = 0;
+	const unsigned int stage363v11KeyboardGeneration = KeyboardStateGeneration();
+	if (turbo && !FCEUMOV_Mode(MOVIEMODE_TASEDITOR))
+	{
+		if (!stage363v11TurboActive)
+		{
+			stage363v11TurboActive = true;
+			stage363v11TurboHasJoystickHotkeys = Stage363v11_HotkeyMapHasJoystick();
+			stage363v11LastKeyboardGeneration = stage363v11KeyboardGeneration;
+		}
+		else if (!stage363v11TurboHasJoystickHotkeys &&
+			stage363v11KeyboardGeneration == stage363v11LastKeyboardGeneration)
+		{
+			return;
+		}
+	}
+	else
+	{
+		stage363v11TurboActive = false;
+		stage363v11TurboHasJoystickHotkeys = false;
+	}
+	stage363v11LastKeyboardGeneration = stage363v11KeyboardGeneration;
 	FCEUI_HandleEmuCommands(FCEUD_TestCommandState);
 }
 
@@ -1881,7 +1933,7 @@ int FCEUD_TestCommandState(int c)
 }
 
 void FCEUD_TurboOn    (void) 
-	{ 
+	{
 		tempwinsync = winsync;	//Store winsync setting
 		winsync = 0;			//turn off winsync for turbo (so that turbo can function even with VBlank sync methods
 		tempsoundquality = soundquality;	//Store sound quality settings
@@ -1912,7 +1964,7 @@ void FCEUD_TurboToggle(void)
 		FCEUI_SetSoundQuality(0);	//Set sound quality to low
 	}
 
-	turbo = !turbo; 
+	turbo = !turbo;
 	if (muteTurbo && soundo)
 	{
 		if (turbo) TrashSound();
